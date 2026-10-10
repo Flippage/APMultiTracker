@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.1
+
+- **Collapsible regions**: click a region header in the check list to collapse or expand it; Ctrl+click does every
+  region. Remembered per game.
+- **Steadier Explain panel**: it keeps a fixed height and shows the previous answer (dimmed) while the next one
+  loads, so the list no longer jumps. New answers fade in with a timestamp, so it's clear they updated.
+- **Updates**: when GitHub can't show the app its releases (for example while the repository is private), Settings
+  now says "Can't check for updates" instead of "Update failed".
+
 ## v0.3.0
 
 - **Built-in updates**, like AutoSwitcher: checks GitHub for new versions, downloads in the background (verified

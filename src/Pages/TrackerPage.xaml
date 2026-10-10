@@ -361,14 +361,39 @@
                     </ListBox.ContextMenu>
                     <ListBox.GroupStyle>
                         <GroupStyle>
-                            <GroupStyle.HeaderTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" Margin="10,12,0,4">
-                                        <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                                        <TextBlock Text="{Binding ItemCount}" FontSize="11.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </GroupStyle.HeaderTemplate>
+                            <GroupStyle.ContainerStyle>
+                                <Style TargetType="GroupItem">
+                                    <EventSetter Event="Loaded" Handler="Group_Loaded"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="GroupItem">
+                                                <StackPanel>
+                                                    <Border x:Name="Head" Background="Transparent" Cursor="Hand" CornerRadius="6"
+                                                            Padding="6,8,8,6" Margin="4,4,4,0" MouseLeftButtonUp="GroupHeader_Click"
+                                                            ToolTip="Click to collapse or expand. Ctrl+click: all regions.">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Viewbox x:Name="Chevron" Width="10" Height="10" Margin="0,1,8,0" RenderTransformOrigin="0.5,0.5">
+                                                                <Viewbox.RenderTransform>
+                                                                    <RotateTransform Angle="0"/>
+                                                                </Viewbox.RenderTransform>
+                                                                <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource AccentBrush}" StrokeThickness="3"/>
+                                                            </Viewbox>
+                                                            <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                                            <TextBlock Text="{Binding ItemCount}" FontSize="11.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <ItemsPresenter x:Name="Items"/>
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </GroupStyle.ContainerStyle>
                         </GroupStyle>
                     </ListBox.GroupStyle>
                 </ListBox>
@@ -396,7 +421,9 @@
                             <TextBox x:Name="ExplainQuery" Style="{StaticResource Field}" MinHeight="36" FontSize="13"
                                      Tag="Location, region or entrance (close spellings are fine)" KeyDown="ExplainQuery_KeyDown"/>
                         </DockPanel>
-                        <ScrollViewer MaxHeight="230" Margin="2,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="ExplainStatus" DockPanel.Dock="Top" FontSize="12" Foreground="{StaticResource AccentBrush}"
+                                   Margin="2,8,0,0" Visibility="Collapsed"/>
+                        <ScrollViewer x:Name="ExplainScroll" Height="220" Margin="2,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel x:Name="ExplainOutput">
                                 <TextBlock Style="{StaticResource Sub}" FontSize="13"
                                            Text="Double-click a check, right-click it, or type a name above."/>

@@ -29,6 +29,8 @@ public sealed class AppConfig
     public CheckFilter Filter { get; set; } = CheckFilter.InLogic;
     public bool GroupByRegion { get; set; } = true;
     public bool ShowRegionNames { get; set; } = true;
+    /// <summary>Per slot (SlotRef.Id): region groups collapsed in the check list.</summary>
+    public Dictionary<string, List<string>> CollapsedRegions { get; set; } = new();
 
     // ---- updates
     public bool AutoDownloadUpdates { get; set; } = true;

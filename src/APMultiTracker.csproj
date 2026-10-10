@@ -10,7 +10,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>APMultiTracker</RootNamespace>
     <AssemblyName>APMultiTracker</AssemblyName>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Product>APMultiTracker</Product>
     <Description>Tracks every game in your Archipelago multiworld in one window.</Description>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>

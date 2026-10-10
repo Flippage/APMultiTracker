@@ -13,7 +13,7 @@ using System.Windows.Threading;
 
 namespace APMultiTracker;
 
-public enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Ready, Installing, Error }
+public enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Ready, Installing, Error, Unavailable }
 
 /// <summary>
 /// Self-updater backed by GitHub Releases (public repo, no auth).
@@ -118,13 +118,13 @@ public sealed class Updater
             LastChecked = DateTime.Now;
             if (!resp.IsSuccessStatusCode)
             {
-                if (manual)
+                if ((int)resp.StatusCode == 404)
                 {
-                    Error = (int)resp.StatusCode == 404
-                        ? "GitHub didn't show any releases. If the repository is private, updates can't be checked from the app."
-                        : $"GitHub returned {(int)resp.StatusCode}.";
-                    Set(UpdateState.Error);
+                    // A private repo (or one with no releases yet) looks like this to an anonymous check.
+                    Error = null;
+                    Set(UpdateState.Unavailable);
                 }
+                else if (manual) { Error = $"GitHub returned {(int)resp.StatusCode}."; Set(UpdateState.Error); }
                 else Set(UpdateState.UpToDate);
                 return;
             }

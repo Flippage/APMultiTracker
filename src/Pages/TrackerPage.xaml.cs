@@ -188,6 +188,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             ? items.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
             : items.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance);
         ListSync.Sync(_checks, sorted.ToList());
+        // Group containers can be reused for other regions as the list changes: re-apply collapsed state.
+        Dispatcher.BeginInvoke(new Action(() => { foreach (var g in FindGroupItems(CheckListBox)) ApplyGroupState(g); }),
+                               DispatcherPriority.Loaded);
 
         bool empty = _checks.Count == 0;
         ListEmpty.Visibility = empty && s.HasData ? Visibility.Visible : Visibility.Collapsed;
@@ -203,6 +206,65 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                     CheckFilter.Hidden => ("No hidden checks", "Hover a check and click the eye to hide it."),
                     _ => ("Nothing here", ""),
                 };
+        }
+    }
+
+    // ------------------------------------------------------------------ collapsible region groups
+
+    private HashSet<string> CollapsedFor(SlotView s)
+    {
+        if (!App.Config.CollapsedRegions.TryGetValue(s.Ref.Id, out var list))
+            App.Config.CollapsedRegions[s.Ref.Id] = list = new List<string>();
+        return new HashSet<string>(list);
+    }
+
+    private void SaveCollapsed(SlotView s, IEnumerable<string> regions)
+    {
+        App.Config.CollapsedRegions[s.Ref.Id] = regions.Distinct().ToList();
+        App.SaveConfig();
+    }
+
+    private void ApplyGroupState(GroupItem g)
+    {
+        if (_shown == null || g.DataContext is not CollectionViewGroup group) return;
+        g.ApplyTemplate();
+        bool collapsed = CollapsedFor(_shown).Contains(group.Name?.ToString() ?? "");
+        if (g.Template.FindName("Items", g) is UIElement items)
+            items.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (g.Template.FindName("Chevron", g) is FrameworkElement chevron)
+            chevron.RenderTransform = new RotateTransform(collapsed ? -90 : 0);   // the template's transform is shared/frozen
+    }
+
+    private void Group_Loaded(object sender, RoutedEventArgs e) { if (sender is GroupItem g) ApplyGroupState(g); }
+
+    private void GroupHeader_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_shown == null || (sender as FrameworkElement)?.DataContext is not CollectionViewGroup group) return;
+        string name = group.Name?.ToString() ?? "";
+        var collapsed = CollapsedFor(_shown);
+        bool collapse = !collapsed.Contains(name);
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            // Ctrl+click: every region follows this one.
+            var all = _view.Groups.OfType<CollectionViewGroup>().Select(gr => gr.Name?.ToString() ?? "");
+            SaveCollapsed(_shown, collapse ? collapsed.Union(all) : collapsed.Except(all));
+        }
+        else
+        {
+            if (collapse) collapsed.Add(name); else collapsed.Remove(name);
+            SaveCollapsed(_shown, collapsed);
+        }
+        foreach (var g in FindGroupItems(CheckListBox)) ApplyGroupState(g);
+        e.Handled = true;
+    }
+
+    private static IEnumerable<GroupItem> FindGroupItems(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is GroupItem g) yield return g;
+            foreach (var nested in FindGroupItems(child)) yield return nested;
         }
     }
 
@@ -348,7 +410,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ExplainToggle.IsChecked = true;
         ExplainQuery.Text = query;
         int seq = ++_explainSeq;
-        ShowExplain(mode == "path" ? $"Finding a path to {query}\u2026" : $"Explaining {query}\u2026", null);
+        ExplainStatus.Text = mode == "path" ? $"Finding a path to {query}\u2026" : $"Explaining {query}\u2026";
+        ExplainStatus.Visibility = Visibility.Visible;
+        ExplainOutput.Opacity = 0.35;   // keep the last answer in place so nothing jumps while this one loads
         ExplainBtn.IsEnabled = PathBtn.IsEnabled = false;
         try
         {
@@ -376,7 +440,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         }
         finally
         {
-            if (seq == _explainSeq) ExplainBtn.IsEnabled = PathBtn.IsEnabled = true;
+            if (seq == _explainSeq)
+            {
+                ExplainBtn.IsEnabled = PathBtn.IsEnabled = true;
+                ExplainStatus.Visibility = Visibility.Collapsed;
+                ExplainOutput.Opacity = 1;
+            }
         }
     }
 
@@ -387,12 +456,16 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ExplainQuery.Text = query;
         {
             ExplainOutput.Children.Clear();
+            ExplainScroll.ScrollToTop();
             ExplainOutput.Children.Add(new TextBlock
             {
                 FontSize = 11.5, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 6),
-                Foreground = (Brush)FindResource("AccentBrush"),
-                Text = (mode == "path" ? "LOGICAL PATH \u00b7 " : "EXPLAIN \u00b7 ") + query.ToUpperInvariant(),
+                Foreground = (Brush)FindResource("AccentBrush"), TextWrapping = TextWrapping.Wrap,
+                Text = (mode == "path" ? "LOGICAL PATH TO " : "EXPLAIN \u00b7 ") + query.ToUpperInvariant()
+                       + $"   \u00b7   {DateTime.Now:HH:mm:ss}",
             });
+            // A short fade so a new answer is visible even when it reads the same as the last one.
+            ExplainOutput.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.2, 1, TimeSpan.FromMilliseconds(220)));
             foreach (var line in lines.OfType<JsonArray>())
             {
                 var tb = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 3),
@@ -410,6 +483,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
     private void ShowExplain(string text, string? color)
     {
+        ExplainOutput.BeginAnimation(OpacityProperty, null);
+        ExplainOutput.Opacity = 1;
         ExplainOutput.Children.Clear();
         ExplainOutput.Children.Add(new TextBlock { Text = text, FontSize = 13, TextWrapping = TextWrapping.Wrap,
                                                    Foreground = ExplainColor(color) ?? (Brush)FindResource("SubBrush") });

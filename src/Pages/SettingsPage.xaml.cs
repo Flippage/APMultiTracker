@@ -217,8 +217,14 @@ public partial class SettingsPage : UserControl
                 sub = $"You're on {cur}.";
                 color = "AccentBrush"; bg = "AccentDimBrush"; icon = (Geometry)FindResource("IconRefresh");
                 break;
+            case UpdateState.Unavailable:
+                title = $"Can't check for updates \u00b7 {cur}";
+                sub = "GitHub isn't showing APMultiTracker's releases to the app, which happens while the repository is private. "
+                    + "Updates work once it's public.";
+                color = "SubBrush"; bg = "CardBrush"; showCheck = true; icon = (Geometry)FindResource("IconGlobe");
+                break;
             case UpdateState.Error:
-                title = "Update failed";
+                title = "Couldn't check for updates";
                 sub = u.Error ?? "Something went wrong.";
                 color = "DangerBrush"; bg = "WarnBgBrush"; showCheck = true;
                 break;
