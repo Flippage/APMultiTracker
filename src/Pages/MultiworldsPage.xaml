@@ -21,7 +21,7 @@
             <TextBlock Text="Multiworlds" Style="{StaticResource H1}" VerticalAlignment="Center"/>
         </DockPanel>
         <TextBlock Grid.Row="1" Style="{StaticResource Sub}" FontSize="13.5" Margin="0,8,0,0" TextWrapping="Wrap"
-                   Text="Save each room you play in: its server and the slots you want to track. Activate one to track all of its games at once."/>
+                   Text="Save each room you play in: its server and the slots you want to track. Activate one to show it. Multiworlds you've connected keep tracking in the background, so switching back is instant."/>
 
         <ScrollViewer Grid.Row="2" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <ItemsControl x:Name="WorldList">
@@ -33,13 +33,14 @@
                                 <DockPanel>
                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                         <Button Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
-                                                Content="Activate" Visibility="{Binding ActivateVis}" Margin="0,0,8,0"
+                                                Content="{Binding ActivateText}" Visibility="{Binding ActivateVis}" Margin="0,0,8,0"
                                                 CommandParameter="{Binding World}" Click="Activate_Click"
-                                                ToolTip="Track these games"/>
+                                                ToolTip="{Binding ActivateTip}"/>
                                         <Button Style="{StaticResource OutlineButton}" Height="36" Padding="16,0" FontSize="13"
-                                                Content="Deactivate" Visibility="{Binding ActiveVis}" Margin="0,0,8,0"
-                                                Foreground="{StaticResource AccentBrush}" BorderBrush="{StaticResource AccentLineBrush}"
-                                                Click="Deactivate_Click" ToolTip="Stop tracking this multiworld"/>
+                                                Content="Disconnect" Visibility="{Binding ConnectedVis}" Margin="0,0,8,0"
+                                                Foreground="{StaticResource Text2Brush}"
+                                                CommandParameter="{Binding World}" Click="Disconnect_Click"
+                                                ToolTip="Stop tracking this multiworld"/>
                                         <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconPencil}" ToolTip="Edit"
                                                 CommandParameter="{Binding World}" Click="Edit_Click"/>
                                         <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconCopy}" ToolTip="Duplicate"
@@ -56,6 +57,13 @@
                                                     BorderBrush="{StaticResource AccentLineBrush}" BorderThickness="1">
                                                 <TextBlock Text="ACTIVE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                                             </Border>
+                                            <Border Visibility="{Binding BackgroundVis}" CornerRadius="6" Padding="7,1,7,2" Margin="10,0,0,0"
+                                                    VerticalAlignment="Center" Background="{StaticResource InLogicDimBrush}"
+                                                    ToolTip="Connected and tracking in the background">
+                                                <TextBlock Text="CONNECTED" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding LiveText}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource InLogicBrush}"
+                                                       VerticalAlignment="Center" Margin="10,1,0,0"/>
                                             <TextBlock Text="{Binding CountText}" FontSize="12.5" Foreground="{StaticResource SubBrush}"
                                                        VerticalAlignment="Center" Margin="10,1,0,0"/>
                                         </StackPanel>

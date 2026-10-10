@@ -15,6 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly TrackerPage _tracker = new();
     private readonly MultiworldsPage _multiworlds = new();
+    private readonly FeedPage _feed = new();
+    private int _unread;
     private readonly SettingsPage _settings = new();
 
     public MainWindow()
@@ -27,6 +29,13 @@ public partial class MainWindow : Window
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateEngineChip);
         App.Tracker.Changed += slot => { if (slot == null || App.Tracker.Focused == null || slot == App.Tracker.Focused) UpdateFocusCard(); };
         App.Tracker.FocusChanged += UpdateFocusCard;
+        App.Tracker.FeedAdded += (world, m) =>
+        {
+            if (world != App.Tracker.ActiveLive || Host.Content == _feed || m.Kind is "Join" or "Part") return;
+            _unread++;
+            UpdateFeedBadge();
+        };
+        App.Tracker.WorldsChanged += () => { _unread = 0; UpdateFeedBadge(); UpdateFocusCard(); };
         SideDock.SizeChanged += (_, _) => UpdateArtVisibility();
         FocusCard.SizeChanged += (_, _) => UpdateArtVisibility();
         PreviewKeyDown += OnPreviewKeyDown;
@@ -41,13 +50,21 @@ public partial class MainWindow : Window
     private void Nav_Checked(object sender, RoutedEventArgs e)
     {
         if (Host == null) return;
-        Host.Content = sender == NavMultiworlds ? _multiworlds : sender == NavSettings ? _settings : _tracker;
+        Host.Content = sender == NavMultiworlds ? _multiworlds : sender == NavSettings ? _settings
+                     : sender == NavFeed ? _feed : _tracker;
+        if (Host.Content == _feed) { _unread = 0; UpdateFeedBadge(); }
     }
 
     public TrackerPage TrackerView => _tracker;
 
     public void GoToTracker() { NavTracker.IsChecked = true; Host.Content = _tracker; }
     public void GoToSettings() => NavSettings.IsChecked = true;
+
+    private void UpdateFeedBadge()
+    {
+        FeedBadge.Visibility = _unread > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FeedBadgeText.Text = _unread > 99 ? "99+" : _unread.ToString();
+    }
 
     public void OpenMultiworldEditor(Multiworld? world)
     {
@@ -274,6 +291,9 @@ public partial class MainWindow : Window
 
     public async Task SelfTestAsync()
     {
+        NavFeed.IsChecked = true;
+        UpdateLayout();
+        _feed.SelfTest();
         foreach (var nav in new[] { NavMultiworlds, NavSettings, NavTracker })
         {
             nav.IsChecked = true;

@@ -97,6 +97,8 @@ public sealed class SlotView : INotifyPropertyChanged
     public string Warning { get => _warning; set { if (Set(ref _warning, value)) Notify(nameof(HasWarning)); } }
     public bool HasWarning => Warning.Length > 0;
 
+    /// <summary>The slot number on the server (0 until connected).</summary>
+    public int SlotNumber { get; private set; }
     public int Checked { get; private set; }
     public int Total { get; private set; }
     public int InLogic { get; private set; }
@@ -165,6 +167,7 @@ public sealed class SlotView : INotifyPropertyChanged
     public void ApplySnapshot(JsonObject m)
     {
         ApplyStatus(m);
+        SlotNumber = (int)Json.Long(m["slot"]);
         Checked = (int)Json.Long(m["checked"]);
         Total = (int)Json.Long(m["total"]);
         InLogic = (int)Json.Long(m["in_logic"]);
@@ -236,34 +239,104 @@ public sealed class SlotView : INotifyPropertyChanged
     }
 }
 
-/// <summary>Owns the active multiworld's slots and keeps the engine tracking exactly those.</summary>
+/// <summary>One coloured piece of a feed message.</summary>
+public sealed record FeedSegment(string Text, string Color);
+
+/// <summary>A server message (item sent, hint, chat, join…), like a line in the Text Client.</summary>
+public sealed record FeedMessage(string Kind, DateTime Time, IReadOnlyList<FeedSegment> Segments, IReadOnlyList<int> Players)
+{
+    public string Text => string.Concat(Segments.Select(s => s.Text));
+    public string TimeText => Time.ToString("HH:mm");
+    public bool IsItem => Kind is "ItemSend" or "ItemCheat";
+    public bool IsHint => Kind == "Hint";
+    public bool IsChat => Kind is "Chat" or "ServerChat";
+}
+
+/// <summary>A multiworld the engine is connected to: its slots and its message feed.</summary>
+public sealed class LiveWorld
+{
+    public const int FeedLimit = 1500;
+    public Multiworld World { get; }
+    public List<SlotView> Slots { get; } = new();
+    public ObservableCollection<FeedMessage> Feed { get; } = new();
+    public LiveWorld(Multiworld world) => World = world;
+
+    public int InLogic => Slots.Sum(s => s.InLogic);
+    public bool HasData => Slots.Any(s => s.HasData);
+
+    public void AddFeed(FeedMessage m)
+    {
+        Feed.Add(m);
+        while (Feed.Count > FeedLimit) Feed.RemoveAt(0);
+    }
+}
+
+/// <summary>
+/// Keeps every connected multiworld tracking in the background and exposes the active one (shown in the UI).
+/// Switching multiworlds is instant because nothing is torn down.
+/// </summary>
 public sealed class TrackerStore
 {
     private readonly EngineHost _engine;
+    private readonly Dictionary<string, LiveWorld> _live = new();
+
+    /// <summary>The active multiworld's slots (what the Tracker page and sidebar show).</summary>
     public ObservableCollection<SlotView> Slots { get; } = new();
     public Multiworld? Active { get; private set; }
+    public LiveWorld? ActiveLive => Active == null ? null : _live.GetValueOrDefault(Active.Id);
+    public IReadOnlyCollection<LiveWorld> Live => _live.Values;
+    public bool IsConnected(Multiworld mw) => _live.ContainsKey(mw.Id);
 
-    /// <summary>Slot data changed (any slot). The argument is the slot, or null when the whole list changed.</summary>
+    /// <summary>Slot data changed. The argument is the slot, or null when the whole list changed.</summary>
     public event Action<SlotView?>? Changed;
+    public event Action? FocusChanged;
+    /// <summary>A multiworld was connected, disconnected or activated.</summary>
+    public event Action? WorldsChanged;
+    /// <summary>A feed message arrived for the given multiworld.</summary>
+    public event Action<LiveWorld, FeedMessage>? FeedAdded;
 
     public TrackerStore(EngineHost engine)
     {
         _engine = engine;
         engine.Client.Message += OnMessage;
         engine.Connected += () => _ = TrackAllAsync();
-        BoxArt.Changed += game => { foreach (var s in Slots) if (string.Equals(s.Game, game, StringComparison.OrdinalIgnoreCase)) s.LoadArt(); };
+        BoxArt.Changed += game =>
+        {
+            foreach (var w in _live.Values)
+                foreach (var s in w.Slots)
+                    if (string.Equals(s.Game, game, StringComparison.OrdinalIgnoreCase)) s.LoadArt();
+        };
     }
 
-    public SlotView? Find(string? id) => id == null ? null : Slots.FirstOrDefault(s => s.Ref.Id == id);
+    /// <summary>On startup: reconnect the multiworlds that were connected last time and show the active one.</summary>
+    public void Restore()
+    {
+        foreach (var id in App.Config.ConnectedMultiworldIds.ToList())
+            if (App.Config.Multiworlds.FirstOrDefault(m => m.Id == id) is { } mw) Connect(mw, save: false);
+        var active = App.Config.Multiworlds.FirstOrDefault(m => m.Id == App.Config.ActiveMultiworldId);
+        Activate(active);
+    }
+
+    public SlotView? Find(string? id)
+    {
+        if (id == null) return null;
+        foreach (var w in _live.Values)
+            foreach (var s in w.Slots)
+                if (s.Ref.Id == id) return s;
+        return null;
+    }
+
+    // ------------------------------------------------------------------ focus (per multiworld)
 
     /// <summary>The game shown on its own, or null for the all-games overview.</summary>
-    public SlotView? Focused => Find(App.Config.FocusedSlotId);
-    public event Action? FocusChanged;
+    public SlotView? Focused =>
+        Active != null && App.Config.FocusByWorld.TryGetValue(Active.Id, out var id) ? Slots.FirstOrDefault(s => s.Ref.Id == id) : null;
 
     public void SetFocus(SlotView? slot)
     {
-        if (App.Config.FocusedSlotId == slot?.Ref.Id) return;
-        App.Config.FocusedSlotId = slot?.Ref.Id;
+        if (Active == null || Focused == slot) return;
+        if (slot == null) App.Config.FocusByWorld.Remove(Active.Id);
+        else App.Config.FocusByWorld[Active.Id] = slot.Ref.Id;
         App.SaveConfig();
         FocusChanged?.Invoke();
     }
@@ -277,68 +350,121 @@ public sealed class TrackerStore
         SetFocus(next == 0 ? null : Slots[next - 1]);
     }
 
+    // ------------------------------------------------------------------ multiworlds
+
+    /// <summary>Show this multiworld (connecting it first if needed). Others stay connected.</summary>
     public void Activate(Multiworld? mw)
     {
-        var old = Slots.ToList();
+        if (mw != null && !_live.ContainsKey(mw.Id)) Connect(mw);
         Active = mw;
         App.Config.ActiveMultiworldId = mw?.Id;
         App.SaveConfig();
         Slots.Clear();
-        if (mw != null)
-        {
-            int i = 0;
-            foreach (var r in mw.Slots.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
-            {
-                var v = new SlotView(r) { Index = i++ };
-                v.LoadArt();
-                Slots.Add(v);
-            }
-        }
-        if (App.Config.FocusedSlotId != null && Find(App.Config.FocusedSlotId) == null) App.Config.FocusedSlotId = null;
+        if (mw != null) foreach (var s in _live[mw.Id].Slots) Slots.Add(s);
         Changed?.Invoke(null);
         FocusChanged?.Invoke();
-        _ = SyncEngineAsync(old);
+        WorldsChanged?.Invoke();
     }
 
-    /// <summary>Re-apply after the multiworld was edited (server, slots, folder…).</summary>
-    public void Reload()
+    /// <summary>Start tracking a multiworld in the background.</summary>
+    public void Connect(Multiworld mw, bool save = true)
     {
-        if (Active == null) return;
-        var mw = App.Config.Multiworlds.FirstOrDefault(m => m.Id == Active.Id);
-        Activate(mw);
+        if (_live.ContainsKey(mw.Id)) return;
+        var live = new LiveWorld(mw);
+        BuildSlots(live);
+        _live[mw.Id] = live;
+        if (save) SaveConnected();
+        WorldsChanged?.Invoke();
+        _ = TrackWorldAsync(live);
     }
 
-    private async System.Threading.Tasks.Task SyncEngineAsync(List<SlotView> old)
+    /// <summary>Stop tracking a multiworld. If it was showing, nothing is shown until another is activated.</summary>
+    public void Disconnect(Multiworld mw)
     {
-        if (!_engine.Client.IsConnected) return;
+        if (!_live.Remove(mw.Id, out var live)) return;
+        SaveConnected();
+        foreach (var s in live.Slots) _ = _engine.Client.UntrackAsync(s.Ref.Id);
+        _ = _engine.Client.ClearFeedAsync(mw.Id);
+        if (Active?.Id == mw.Id) Activate(null);
+        else WorldsChanged?.Invoke();
+    }
+
+    /// <summary>Re-apply after a multiworld was edited (server, slots, folder…), keeping slots that didn't change.</summary>
+    public void Reload(Multiworld mw)
+    {
+        if (!_live.TryGetValue(mw.Id, out var live)) return;
+        var old = live.Slots.ToList();
+        BuildSlots(live, old);
         foreach (var o in old)
-            if (Find(o.Ref.Id) == null) await _engine.Client.UntrackAsync(o.Ref.Id);
-        await TrackAllAsync();
+            if (!live.Slots.Contains(o)) _ = _engine.Client.UntrackAsync(o.Ref.Id);
+        if (Active?.Id == mw.Id) Activate(mw);
+        _ = TrackWorldAsync(live);
+    }
+
+    private static void BuildSlots(LiveWorld live, List<SlotView>? reuse = null)
+    {
+        live.Slots.Clear();
+        int i = 0;
+        foreach (var r in live.World.Slots.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+        {
+            var v = reuse?.FirstOrDefault(o => o.Ref.Id == r.Id && o.Ref.Name == r.Name);
+            if (v == null) { v = new SlotView(r); v.LoadArt(); }
+            v.Index = i++;
+            live.Slots.Add(v);
+        }
+    }
+
+    private void SaveConnected()
+    {
+        App.Config.ConnectedMultiworldIds = _live.Keys.ToList();
+        App.SaveConfig();
     }
 
     private async System.Threading.Tasks.Task TrackAllAsync()
     {
-        if (Active == null) return;
-        foreach (var s in Slots.ToList())
+        foreach (var live in _live.Values.ToList()) await TrackWorldAsync(live);
+    }
+
+    private async System.Threading.Tasks.Task TrackWorldAsync(LiveWorld live)
+    {
+        if (!_engine.Client.IsConnected) return;
+        foreach (var s in live.Slots.ToList())
         {
             if (s.Status == "offline") s.Status = "connecting";
-            await _engine.Client.TrackAsync(s.Ref.Id, Active, s.Ref);
+            await _engine.Client.TrackAsync(s.Ref.Id, live.World, s.Ref);
         }
     }
 
-    public System.Threading.Tasks.Task RefreshAsync(SlotView? slot) => _engine.Client.RefreshAsync(slot?.Ref.Id);
+    // ------------------------------------------------------------------ engine commands
+
+    public System.Threading.Tasks.Task RefreshAsync(SlotView? slot)
+    {
+        if (slot != null) return _engine.Client.RefreshAsync(slot.Ref.Id);
+        return System.Threading.Tasks.Task.WhenAll(Slots.Select(s => _engine.Client.RefreshAsync(s.Ref.Id)));
+    }
 
     public System.Threading.Tasks.Task SetHiddenAsync(SlotView slot, IEnumerable<long> ids, bool hidden) =>
         _engine.Client.SetIgnoredAsync(slot.Ref.Id, ids.ToArray(), hidden);
+
+    // ------------------------------------------------------------------ engine messages
 
     private void OnMessage(JsonObject m)
     {
         string type = m["type"]?.GetValue<string>() ?? "";
         if (type == "error") { Log.Warn("engine", m["message"]?.GetValue<string>() ?? ""); return; }
+        if (type == "feed") { AddFeed(m["room"]?.GetValue<string>(), m); return; }
+        if (type == "feed_backlog")
+        {
+            string? room = m["room"]?.GetValue<string>();
+            if (room != null && _live.TryGetValue(room, out var lw) && lw.Feed.Count == 0 && m["messages"] is JsonArray arr)
+                foreach (var item in arr.OfType<JsonObject>()) AddFeed(room, item);
+            return;
+        }
+
         var slot = Find(m["id"]?.GetValue<string>());
         if (slot == null)
         {
-            // Left over from a multiworld we're no longer showing.
+            // Left over from a multiworld that's no longer connected.
             if (type is "slot" or "status" && m["id"]?.GetValue<string>() is string stale && _engine.Client.IsConnected)
                 _ = _engine.Client.UntrackAsync(stale);
             return;
@@ -356,12 +482,28 @@ public sealed class TrackerStore
         Changed?.Invoke(slot);
     }
 
+    internal void AddFeed(string? room, JsonObject m)
+    {
+        if (room == null || !_live.TryGetValue(room, out var live)) return;
+        var segs = (m["segments"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Select(x => new FeedSegment(x["text"]?.GetValue<string>() ?? "", x["color"]?.GetValue<string>() ?? ""))
+            .ToList();
+        var players = (m["players"] as JsonArray ?? new JsonArray()).Select(x => (int)Json.Long(x)).ToList();
+        double t = m["time"] is JsonValue tv && tv.TryGetValue(out double d) ? d : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var msg = new FeedMessage(m["kind"]?.GetValue<string>() ?? "Text",
+            DateTimeOffset.FromUnixTimeMilliseconds((long)(t * 1000)).LocalDateTime, segs, players);
+        live.AddFeed(msg);
+        FeedAdded?.Invoke(live, msg);
+    }
+
     public void RaiseChanged(SlotView? slot) => Changed?.Invoke(slot);
 
     /// <summary>When the engine goes away, every slot is offline until it's back.</summary>
     public void MarkAllOffline()
     {
-        foreach (var s in Slots) if (s.Status != "offline") { s.Status = "offline"; s.Message = ""; }
+        foreach (var w in _live.Values)
+            foreach (var s in w.Slots)
+                if (s.Status != "offline") { s.Status = "offline"; s.Message = ""; }
         Changed?.Invoke(null);
     }
 }

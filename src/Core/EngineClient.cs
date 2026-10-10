@@ -136,7 +136,18 @@ public sealed class EngineClient
     {
         ["cmd"] = "track", ["id"] = id, ["server"] = mw.Server.Trim(), ["slot"] = slot.Name.Trim(),
         ["password"] = string.IsNullOrEmpty(mw.Password) ? null : mw.Password, ["yaml_folder"] = mw.YamlFolder,
+        ["room"] = mw.Id,
     });
+
+    /// <summary>Sends a chat message or server command (e.g. !hint) as one of the tracked slots. Returns an error or null.</summary>
+    public async System.Threading.Tasks.Task<string?> SayAsync(string id, string text)
+    {
+        var reply = await RequestAsync(new JsonObject { ["cmd"] = "say", ["id"] = id, ["text"] = text }, TimeSpan.FromSeconds(10));
+        if (reply == null) return "No answer from the engine.";
+        return reply["error"]?.GetValue<string>();
+    }
+
+    public Task ClearFeedAsync(string room) => SendAsync(new JsonObject { ["cmd"] = "clear_feed", ["room"] = room });
 
     public Task UntrackAsync(string id) => SendAsync(new JsonObject { ["cmd"] = "untrack", ["id"] = id });
 

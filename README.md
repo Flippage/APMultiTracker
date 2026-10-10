@@ -38,7 +38,8 @@ in one place, with a faster, cleaner interface.
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |
-| 🌍 **Saved multiworlds** | Save rooms with their server and slots. **Find slots in this room** lists everyone so you can click to add. |
+| 💬 **Feed** | The room's messages as they happen, like the Text Client: items sent, hints, chat and goals, colour-coded and filterable. Chat or `!hint` from any of your slots. |
+| 🌍 **Several multiworlds at once** | Save rooms with their server and slots (**Find slots in this room** lists everyone). Keep several connected and switch between them instantly. |
 | ⚙️ **Zero fuss engine** | One click installs the engine into Archipelago; the app starts and stops it for you. |
 
 <p align="center">
@@ -54,6 +55,23 @@ location, region or entrance (close spellings are fine). It runs Universal Track
 <p align="center">
   <img src="docs/screenshots/explain.png" alt="Logical path to a check" width="900">
 </p>
+
+## Feed
+
+Everything happening in the room, like Archipelago's Text Client: items sent (coloured by importance),
+hints, chat, goals and releases. Filter by Items, Hints, Chat or Activity, or turn on **Only my slots**.
+Type in the box at the bottom to chat or run server commands such as `!hint Hookshot` as any of your slots.
+Each message shows once, even though every tracked slot hears it, and the tracker's own connections are hidden.
+
+<p align="center">
+  <img src="docs/screenshots/feed.png" alt="The room's message feed" width="900">
+</p>
+
+## Several multiworlds at once
+
+Every multiworld you **Activate** stays connected in the background. The sidebar, Tracker and Feed show the active
+one; use **Switch multiworld** on the Tracker (or **Switch to** on Multiworlds) to jump between them instantly, with
+no reloading. **Disconnect** stops tracking one. Connected multiworlds reconnect when you start the app.
 
 ## Requirements
 

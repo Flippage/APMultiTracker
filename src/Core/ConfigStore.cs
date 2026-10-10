@@ -8,8 +8,11 @@ namespace APMultiTracker;
 /// <summary>Config lives in %APPDATA%\APMultiTracker. Tokens and room passwords are encrypted with DPAPI.</summary>
 public static class ConfigStore
 {
+    /// <summary>%APPDATA%\APMultiTracker, or APMULTITRACKER_HOME if set (keeps test runs away from real settings).</summary>
     public static readonly string Dir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APMultiTracker");
+        Environment.GetEnvironmentVariable("APMULTITRACKER_HOME") is { Length: > 0 } home
+            ? Path.GetFullPath(home)
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APMultiTracker");
 
     private static string ConfigPath => Path.Combine(Dir, "config.json");
     private static string TokenPath => Path.Combine(Dir, "tokens.dat");

@@ -44,8 +44,11 @@ public partial class App : Application
 
         if (!DemoMode)
         {
-            _mutex = new Mutex(true, "APMultiTracker.SingleInstance.v1", out bool isFirst);
-            _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "APMultiTracker.Show.v1");
+            // One instance per settings folder (a test copy with APMULTITRACKER_HOME never touches the real one).
+            string scope = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(
+                System.Text.Encoding.UTF8.GetBytes(ConfigStore.Dir.ToLowerInvariant())))[..12];
+            _mutex = new Mutex(true, "APMultiTracker.SingleInstance.v1." + scope, out bool isFirst);
+            _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "APMultiTracker.Show.v1." + scope);
             if (!isFirst)
             {
                 _showSignal.Set();
@@ -102,8 +105,7 @@ public partial class App : Application
         if (_showSignal != null)
             ThreadPool.RegisterWaitForSingleObject(_showSignal, (_, _) => Dispatcher.InvokeAsync(ShowMain), null, Timeout.Infinite, false);
 
-        var active = Config.Multiworlds.FirstOrDefault(m => m.Id == Config.ActiveMultiworldId);
-        Tracker.Activate(active);
+        Tracker.Restore();
 
         if (_selfTest) { _ = RunSelfTestAsync(window); return; }
         if (_screenshotDir != null)

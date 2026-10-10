@@ -49,10 +49,11 @@ public static class Demo
             Multiworlds =
             {
                 mw,
-                new Multiworld { Name = "Async with the crew", Server = "archipelago.gg:51234",
+                new Multiworld { Id = "demo2", Name = "Async with the crew", Server = "archipelago.gg:51234",
                     Slots = { new SlotRef { Name = "FlippMario", Game = "Super Mario 64" }, new SlotRef { Name = "FlippBanjo", Game = "Banjo-Tooie" } } },
             },
             ActiveMultiworldId = mw.Id,
+            ConnectedMultiworldIds = { mw.Id, "demo2" },
         };
     }
 
@@ -91,6 +92,7 @@ public static class Demo
             slot.ApplySnapshot(new JsonObject
             {
                 ["type"] = "slot", ["id"] = g.Id, ["status"] = "tracking", ["message"] = "", ["game"] = g.Game, ["slot_name"] = g.Slot,
+                ["slot"] = Array.IndexOf(Games, g) + 1,
                 ["checked"] = g.Checked, ["total"] = g.Total, ["in_logic"] = inLogic,
                 ["glitched"] = locs.Count(l => l!["status"]!.GetValue<string>() == "glitched"),
                 ["hinted"] = locs.Count(l => l!["hint"] != null), ["ignored"] = 1,
@@ -100,6 +102,37 @@ public static class Demo
         }
         store.SetFocus(null);
         store.RaiseChanged(null);
+        FeedDemo(store);
+    }
+
+    private static JsonObject S(string text, string color = "") => new() { ["text"] = text, ["color"] = color };
+
+    private static void FeedDemo(TrackerStore store)
+    {
+        var start = DateTimeOffset.Now.AddMinutes(-14).ToUnixTimeSeconds();
+        int n = 0;
+        void Add(string kind, int[] players, params JsonObject[] segs)
+        {
+            var arr = new JsonArray();
+            foreach (var p in players) arr.Add(p);
+            store.AddFeed("demo", new JsonObject
+            {
+                ["type"] = "feed", ["room"] = "demo", ["kind"] = kind, ["time"] = start + 70 * n++,
+                ["segments"] = new JsonArray(segs), ["players"] = arr,
+            });
+        }
+        Add("Join", new[] { 5 }, S("Kiwi (Team #1) playing A Link to the Past has joined. Client(0.6.7), ['AP']."));
+        Add("ItemSend", new[] { 1, 2 }, S("FlippKnight", "player_self"), S(" sent "), S("Progressive Hookshot", "item_prog"), S(" to "), S("FlippLink", "player_self"), S(" ("), S("Sly_2", "location"), S(")"));
+        Add("ItemSend", new[] { 5, 3 }, S("Kiwi", "player"), S(" sent "), S("Copper Pan", "item_useful"), S(" to "), S("FlippFarmer", "player_self"), S(" ("), S("Desert Palace - Big Chest", "location"), S(")"));
+        Add("ItemSend", new[] { 4 }, S("FlippTime", "player_self"), S(" found their "), S("Security Keycard C", "item_prog"), S(" ("), S("Library: Backer room chest 5", "location"), S(")"));
+        Add("Chat", new[] { 5 }, S("Kiwi: anyone have my hammer yet?"));
+        Add("ItemSend", new[] { 2, 5 }, S("FlippLink", "player_self"), S(" sent "), S("Hammer", "item_prog"), S(" to "), S("Kiwi", "player"), S(" ("), S("KF Midos Top Left Chest", "location"), S(")"));
+        Add("Chat", new[] { 1 }, S("FlippKnight: !hint Mantis Claw"));
+        Add("Hint", new[] { 1, 5 }, S("[Hint]: "), S("FlippKnight", "player_self"), S("'s "), S("Mantis Claw", "item_prog"), S(" is at "), S("Kakariko Well - Bottom", "location"), S(" in "), S("Kiwi", "player"), S("'s World. "), S("(unspecified)"));
+        Add("ItemSend", new[] { 5, 4 }, S("Kiwi", "player"), S(" sent "), S("Sand", "item"), S(" to "), S("FlippTime", "player_self"), S(" ("), S("Ice Palace - Map Chest", "location"), S(")"));
+        Add("ItemSend", new[] { 3, 1 }, S("FlippFarmer", "player_self"), S(" sent "), S("Vessel_Fragment", "item_useful"), S(" to "), S("FlippKnight", "player_self"), S(" ("), S("Harvest Parsnip", "location"), S(")"));
+        Add("Goal", new[] { 5 }, S("Kiwi (Team #1) has completed their goal."));
+        Add("ItemSend", new[] { 1, 5 }, S("FlippKnight", "player_self"), S(" sent "), S("Spike Trap", "item_trap"), S(" to "), S("Kiwi", "player"), S(" ("), S("Grub-Crossroads_Acid", "location"), S(")"));
     }
 
     /// <summary>Renders each page to PNG for the README.</summary>
@@ -137,6 +170,8 @@ public static class Demo
               ("Mantis Claw", "item"), (" (", ""), ("missing", "red"), (")", "")),
             L(("->", ""), ("Mantis_Claw", "green"))));
         await Shot("explain");
+        w.NavFeed.IsChecked = true;
+        await Shot("feed");
         w.NavMultiworlds.IsChecked = true;
         await Shot("multiworlds");
         w.OpenMultiworldEditor(App.Config.Multiworlds[0]);

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0
+
+- **Feed**: a new page with the room's messages as they happen, like the Text Client. Items sent (coloured by
+  importance), hints, chat, goals and releases, with filters and "Only my slots". Chat or run commands like
+  `!hint` as any of your slots. Each message shows once, and the tracker's own connections are hidden.
+- **Several multiworlds at once**: activated multiworlds stay connected in the background, so switching is instant.
+  The sidebar shows the active one. Switch from the Tracker's "Switch multiworld" menu or the Multiworlds page.
+- Each multiworld remembers which game you had focused.
+- The engine updates itself automatically when the app has a newer one.
+
 ## v0.1.0
 
 First version.

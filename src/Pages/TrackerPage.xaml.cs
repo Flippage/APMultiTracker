@@ -62,6 +62,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void OnTrackerChanged(SlotView? slot)
     {
         if (slot == null) { RefreshAll(); return; }
+        if (!App.Tracker.Slots.Contains(slot)) return;   // a multiworld tracking in the background
         UpdateAllCount();
         if (slot == _shown) RefreshFocused();
     }
@@ -423,6 +424,24 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void Art_Click(object sender, MouseButtonEventArgs e)
     {
         if (_shown != null && _shown.Game.Length > 0) (Window.GetWindow(this) as MainWindow)?.OpenArtPicker(_shown.Game);
+    }
+
+    /// <summary>Connected multiworlds (instant) plus a way to the full list.</summary>
+    private void Switch_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = SwitchBtn, Placement = PlacementMode.Bottom };
+        foreach (var live in App.Tracker.Live.OrderBy(l => App.Config.Multiworlds.IndexOf(l.World)))
+        {
+            string count = live.HasData ? $"  ·  {live.InLogic} in logic" : "";
+            var item = new MenuItem { Header = live.World.Name + count, IsCheckable = true, IsChecked = live.World == App.Tracker.Active };
+            item.Click += (_, _) => App.Tracker.Activate(live.World);
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+        var manage = new MenuItem { Header = "All multiworlds…" };
+        manage.Click += (_, _) => Multiworlds_Click(this, new RoutedEventArgs());
+        menu.Items.Add(manage);
+        menu.IsOpen = true;
     }
 
     private void Multiworlds_Click(object sender, RoutedEventArgs e) =>

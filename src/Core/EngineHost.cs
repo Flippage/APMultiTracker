@@ -314,7 +314,19 @@ public sealed class EngineHost
         Log.Info("engine", $"Connected to engine {Client.EngineVersion} (UT {Client.UtVersion}, AP {Client.ApVersion})");
         Set(EngineState.Running);
         Connected?.Invoke();
+        // An older engine is running (e.g. left from a previous version): update it once.
+        if (!_triedEngineUpdate && ApDir != null && Compare(Client.EngineVersion, BundledEngineVersion) < 0)
+        {
+            _triedEngineUpdate = true;
+            Log.Info("engine", $"Engine {Client.EngineVersion} is older than {BundledEngineVersion}; updating it");
+            _ = _ui.InvokeAsync(async () =>
+            {
+                try { await InstallEngineAsync(); }
+                catch (Exception ex) { Log.Error("engine", "Engine update failed", ex); }
+            });
+        }
     }
+    private bool _triedEngineUpdate;
 
     private void OnDisconnected()
     {

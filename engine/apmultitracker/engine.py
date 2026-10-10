@@ -15,7 +15,9 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
@@ -89,13 +91,14 @@ class SlotContext(CommonContext):
     want_slot_data = True
 
     def __init__(self, engine: "Engine", sid: str, server: str, slot_name: str, password: Optional[str],
-                 yaml_folder: str):
+                 yaml_folder: str, room: str = ""):
         super().__init__(server, password or None)
         self.engine = engine
         self.sid = sid
         self.auth = slot_name
         self.slot_name = slot_name  # CommonContext clears .auth on disconnect
         self.requested_server = server
+        self.room = room or server
         self.yaml_folder = yaml_folder or ""
         self.core = None
         self.logic_ready = False
@@ -146,7 +149,10 @@ class SlotContext(CommonContext):
             self.set_status("reconnecting", "Lost connection to the server. Reconnecting…")
 
     def on_print_json(self, args: dict):
-        pass  # chat / item messages are not shown; avoids N copies of every message in the log
+        try:
+            self.engine.on_feed(self, args)
+        except Exception:
+            log.error(traceback.format_exc())
 
     def on_package(self, cmd: str, args: dict):
         try:
@@ -449,7 +455,7 @@ class SlotContext(CommonContext):
         lines = [self._render(parts) for parts in shim.messages if parts]
         return lines or [[{"text": "Nothing to explain.", "color": ""}]]
 
-    def _render(self, parts) -> list[dict]:
+    def _render(self, parts, own_slots: frozenset = frozenset()) -> list[dict]:
         """AP JSON message parts → plain segments the app can colour (names resolved here)."""
         if isinstance(parts, dict):
             parts = [parts]
@@ -460,9 +466,17 @@ class SlotContext(CommonContext):
             color = p.get("color", "") if kind == "color" else ""
             try:
                 if kind == "player_id":
-                    text, color = self.player_names.get(int(text), text), "player"
+                    slot = int(text)
+                    text = self.player_names.get(slot, text)
+                    color = "player_self" if slot in own_slots else "player"
                 elif kind == "item_id":
-                    text, color = self.item_names.lookup_in_slot(int(text), p.get("player", self.slot)), "item"
+                    text = self.item_names.lookup_in_slot(int(text), p.get("player", self.slot))
+                    flags = int(p.get("flags", 0))
+                    color = "item_prog" if flags & 1 else "item_useful" if flags & 2 else "item_trap" if flags & 4 \
+                        else "item"
+                elif kind == "hint_status":
+                    color = {0: "", 10: "slateblue", 20: "salmon", 30: "plum", 40: "green"}.get(
+                        int(p.get("hint_status", 0)), "")
                 elif kind == "location_id":
                     text, color = self.location_names.lookup_in_slot(int(text), p.get("player", self.slot)), "location"
                 elif kind in ("item_name", "location_name", "entrance_name", "player_name"):
@@ -483,6 +497,11 @@ class SlotContext(CommonContext):
             self.core.ignored_locations.difference_update(location_ids)
         Utils.persistent_store(PERSIST_KEY, self.persist_id, {"ignored": sorted(self.core.ignored_locations)})
         self.watcher_event.set()
+
+    async def say(self, text: str):
+        if self.slot is None:
+            raise EngineError(f"{self.slot_name} isn't connected right now.")
+        await self.send_msgs([{"cmd": "Say", "text": text}])
 
     async def stop(self):
         self.set_status("stopped", "")
@@ -579,6 +598,8 @@ class Engine:
         self.clients: set = set()
         self.last: dict[str, dict] = {}
         self.yaml_worlds: dict[str, Any] = {}
+        self.feed: dict[str, deque] = {}            # room -> recent messages (sent to the app when it connects)
+        self.feed_recent: dict[str, dict] = {}      # room -> message key -> (time, slots that delivered it)
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="apmt-logic")
         self.stop_event = asyncio.Event()
         self.tasks: set[asyncio.Task] = set()
@@ -639,6 +660,48 @@ class Engine:
         if sid in self.slots:
             self.emit(payload)
 
+    # ---- message feed (like the Text Client, one copy per room)
+
+    def on_feed(self, ctx: "SlotContext", args: dict) -> None:
+        kind = args.get("type", "")
+        if kind == "Tutorial":
+            return
+        room = ctx.room
+        now = time.monotonic()
+        key = json.dumps(args, sort_keys=True, default=str)
+        recent = self.feed_recent.setdefault(room, {})
+        for k in [k for k, (t, _) in recent.items() if now - t > 8]:
+            del recent[k]
+        # Every tracked slot in a room receives room-wide messages: keep the first copy only.
+        # The same slot delivering the same message again is a genuine repeat.
+        seen = recent.get(key)
+        if seen and ctx.sid not in seen[1]:
+            seen[1].add(ctx.sid)
+            return
+        recent[key] = (now, {ctx.sid})
+
+        own_slots = frozenset(c.slot for c in self.slots.values() if c.room == room and c.slot is not None)
+        data = args.get("data") or []
+        text = "".join(str(p.get("text", "")) for p in data)
+        own_names = {c.slot_name for c in self.slots.values() if c.room == room}
+        is_ours = args.get("slot") in own_slots or ctx.player_names.get(args.get("slot")) in own_names
+        if kind in ("Join", "Part") and is_ours \
+                and ("Tracker" in (args.get("tags") or []) or "stopped tracking" in text):
+            return  # our own tracker connections coming and going
+
+        players = {int(p["text"]) for p in data if p.get("type") == "player_id" and str(p.get("text", "")).isdigit()}
+        for field in ("receiving", "slot"):
+            if isinstance(args.get(field), int):
+                players.add(args[field])
+        if isinstance(args.get("item"), (list, tuple)) and len(args["item"]) > 2:
+            players.add(int(args["item"][2]))
+        elif isinstance(args.get("item"), dict) and "player" in args["item"]:
+            players.add(int(args["item"]["player"]))
+        message = {"type": "feed", "room": room, "kind": kind or "Text", "time": time.time(),
+                   "segments": ctx._render(data, own_slots), "players": sorted(players)}
+        self.feed.setdefault(room, deque(maxlen=400)).append(message)
+        self.emit(message)
+
     def hello(self) -> dict:
         return {"type": "hello", "engine": ENGINE_VERSION, "ut": ut_version(), "ap": Utils.__version__}
 
@@ -656,6 +719,8 @@ class Engine:
         await ws.send(json.dumps(self.hello()))
         for ctx in self.slots.values():
             await ws.send(json.dumps(self.last.get(ctx.sid) or ctx.status_payload()))
+        for room, messages in self.feed.items():
+            await ws.send(json.dumps({"type": "feed_backlog", "room": room, "messages": list(messages)}))
         try:
             async for raw in ws:
                 try:
@@ -671,7 +736,8 @@ class Engine:
     async def command(self, ws, msg: dict) -> None:
         cmd = msg.get("cmd")
         if cmd == "track":
-            await self.track(msg["id"], msg["server"], msg["slot"], msg.get("password"), msg.get("yaml_folder", ""))
+            await self.track(msg["id"], msg["server"], msg["slot"], msg.get("password"), msg.get("yaml_folder", ""),
+                             msg.get("room", ""))
         elif cmd == "untrack":
             await self.untrack(msg["id"])
         elif cmd == "ignore":
@@ -689,15 +755,28 @@ class Engine:
             ctx = self.slots.get(msg["id"])
             lines = await ctx.explain(str(msg.get("query", "")), msg.get("mode", "explain")) if ctx                 else [[{"text": "That game isn't being tracked.", "color": "red"}]]
             await ws.send(json.dumps({"type": "explain", "req": msg.get("req"), "lines": lines}))
+        elif cmd == "say":
+            ctx = self.slots.get(msg["id"])
+            error = None
+            try:
+                if ctx is None:
+                    raise EngineError("That slot isn't being tracked.")
+                await ctx.say(str(msg.get("text", "")))
+            except EngineError as e:
+                error = str(e)
+            await ws.send(json.dumps({"type": "said", "req": msg.get("req"), "error": error}))
+        elif cmd == "clear_feed":
+            self.feed.pop(msg.get("room", ""), None)
         elif cmd == "ping":
             await ws.send(json.dumps({"type": "pong", "req": msg.get("req")}))
         elif cmd == "shutdown":
             self.stop_event.set()
 
-    async def track(self, sid: str, server: str, slot: str, password: Optional[str], yaml_folder: str):
+    async def track(self, sid: str, server: str, slot: str, password: Optional[str], yaml_folder: str,
+                    room: str = ""):
         old = self.slots.get(sid)
-        if old and (old.server_address or "").endswith(server) and old.auth == slot \
-                and old.yaml_folder == (yaml_folder or "") and old.status != "error":
+        if old and old.requested_server == server and old.slot_name == slot and old.password == (password or None) \
+                and old.yaml_folder == (yaml_folder or "") and old.room == (room or server) and old.status != "error":
             return  # already tracking exactly this
         if old:
             await self.untrack(sid)
@@ -708,7 +787,7 @@ class Engine:
                        "slot_name": slot})
             return
         log.info(f"Tracking {slot} on {server}")
-        ctx = SlotContext(self, sid, server, slot, password, yaml_folder)
+        ctx = SlotContext(self, sid, server, slot, password, yaml_folder, room)
         self.slots[sid] = ctx
         self.send_status(ctx)
         ctx.server_task = asyncio.create_task(server_loop(ctx), name=f"server loop {sid}")
@@ -732,7 +811,7 @@ class Engine:
                 self.spawn(ctx._initialize(rebuild=True), f"init {ctx.sid}")
             else:
                 await self.untrack(ctx.sid)
-                await self.track(ctx.sid, ctx.requested_server, ctx.slot_name, ctx.password, ctx.yaml_folder)
+                await self.track(ctx.sid, ctx.requested_server, ctx.slot_name, ctx.password, ctx.yaml_folder, ctx.room)
 
     async def probe(self, server: str, slot: str, password: Optional[str]):
         ctx = ProbeContext(server, slot, password)

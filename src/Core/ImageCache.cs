@@ -23,7 +23,9 @@ public static class ImageCache
     private static readonly Dictionary<string, ImageSource> Memory = new();
     private static readonly Dictionary<string, Task<ImageSource?>> InFlight = new();
     private static readonly string Dir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "APMultiTracker", "art");
+        Environment.GetEnvironmentVariable("APMULTITRACKER_HOME") is { Length: > 0 } home
+            ? Path.Combine(Path.GetFullPath(home), "art")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "APMultiTracker", "art");
     private static readonly Regex SizeSuffix = new(@"-\d+x\d+(\.\w+)$", RegexOptions.Compiled);
 
     /// <summary>Twitch box art comes as a template ({width}x{height}) or a fixed 52x72 size; ask for 2x for HiDPI.</summary>

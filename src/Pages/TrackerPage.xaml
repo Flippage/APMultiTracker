@@ -100,8 +100,14 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="RefreshAllBtn" Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}" Margin="0,0,8,0"
                         ToolTip="Rebuild logic for every game (re-reads YAMLs)" Click="RefreshAll_Click"/>
-                <Button Style="{StaticResource OutlineButton}" Padding="18,0" Click="Multiworlds_Click">
-                    <TextBlock Text="Switch multiworld" FontWeight="Normal" Foreground="{StaticResource Text2Brush}"/>
+                <Button x:Name="SwitchBtn" Style="{StaticResource OutlineButton}" Padding="18,0" Click="Switch_Click"
+                        ToolTip="Switch between connected multiworlds instantly">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Switch multiworld" FontWeight="Normal" Foreground="{StaticResource Text2Brush}"/>
+                        <Viewbox Width="10" Height="10" Margin="10,1,0,0">
+                            <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource Text2Brush}" StrokeThickness="3"/>
+                        </Viewbox>
+                    </StackPanel>
                 </Button>
             </StackPanel>
             <StackPanel>

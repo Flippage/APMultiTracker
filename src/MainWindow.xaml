@@ -81,6 +81,15 @@
 
                 <StackPanel x:Name="NavMenu" VerticalAlignment="Top">
                     <RadioButton x:Name="NavTracker" Style="{StaticResource NavButton}" Content="Tracker" Tag="{StaticResource IconTarget}" Checked="Nav_Checked"/>
+                    <Grid>
+                        <RadioButton x:Name="NavFeed" Style="{StaticResource NavButton}" Content="Feed" Tag="{StaticResource IconChat}" Checked="Nav_Checked"/>
+                        <Border x:Name="FeedBadge" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                                CornerRadius="8" Padding="7,1,7,2" Background="{StaticResource AccentDimBrush}"
+                                BorderBrush="{StaticResource AccentLineBrush}" BorderThickness="1"
+                                IsHitTestVisible="False" Visibility="Collapsed">
+                            <TextBlock x:Name="FeedBadgeText" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                        </Border>
+                    </Grid>
                     <RadioButton x:Name="NavMultiworlds" Style="{StaticResource NavButton}" Content="Multiworlds" Tag="{StaticResource IconGlobe}" Checked="Nav_Checked"/>
                     <Grid>
                         <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" Content="Settings" Tag="{StaticResource IconGear}" Checked="Nav_Checked"/>

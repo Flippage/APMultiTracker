@@ -173,7 +173,7 @@ public partial class EditMultiworldPage : UserControl
         w.Slots = slots;
         if (_original == null) App.Config.Multiworlds.Add(w);
         App.SaveConfig();
-        if (App.Tracker.Active?.Id == w.Id) App.Tracker.Reload();
+        App.Tracker.Reload(w);
         return w;
     }
 
@@ -188,7 +188,6 @@ public partial class EditMultiworldPage : UserControl
         if (w == null) return;
         if (App.Tracker.Active?.Id != w.Id)
         {
-            App.Config.FocusedSlotId = null;
             App.Tracker.Activate(w);
         }
         Main?.CloseMultiworldEditor();

@@ -1,0 +1,91 @@
+<UserControl x:Class="APMultiTracker.FeedPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:APMultiTracker">
+    <Grid Margin="32,26,32,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Padding="18,0" Click="Clear_Click"
+                    ToolTip="Clear the messages shown here (the room isn't affected)">
+                <TextBlock Text="Clear" FontWeight="Normal" Foreground="{StaticResource Text2Brush}"/>
+            </Button>
+            <StackPanel>
+                <TextBlock Text="Feed" Style="{StaticResource H1}"/>
+                <TextBlock x:Name="SubText" Style="{StaticResource Sub}" FontSize="13" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DockPanel>
+
+        <DockPanel Grid.Row="1" Margin="0,16,0,10">
+            <CheckBox x:Name="MineToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}" Content="Only my slots" FontSize="12.5"
+                      Checked="Filter_Changed" Unchecked="Filter_Changed"
+                      ToolTip="Only messages involving the slots you're tracking"/>
+            <WrapPanel VerticalAlignment="Center">
+                <RadioButton x:Name="AllPill" Style="{StaticResource FilterPill}" GroupName="Feed" Tag="All" Checked="Filter_Changed">All</RadioButton>
+                <RadioButton x:Name="ItemsPill" Style="{StaticResource FilterPill}" GroupName="Feed" Tag="Items" Checked="Filter_Changed">Items</RadioButton>
+                <RadioButton x:Name="HintsPill" Style="{StaticResource FilterPill}" GroupName="Feed" Tag="Hints" Checked="Filter_Changed">Hints</RadioButton>
+                <RadioButton x:Name="ChatPill" Style="{StaticResource FilterPill}" GroupName="Feed" Tag="Chat" Checked="Filter_Changed">Chat</RadioButton>
+                <RadioButton x:Name="ActivityPill" Style="{StaticResource FilterPill}" GroupName="Feed" Tag="Activity" Checked="Filter_Changed"
+                             ToolTip="Joins, goals, releases and server notices">Activity</RadioButton>
+            </WrapPanel>
+        </DockPanel>
+
+        <ListBox x:Name="List" Grid.Row="2" Style="{StaticResource CheckList}" ScrollViewer.ScrollChanged="List_ScrollChanged">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type local:FeedMessage}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding TimeText}" Style="{StaticResource Mono}" FontSize="11"
+                                   Foreground="#6A6A6A" Width="46" Margin="0,2,6,0" VerticalAlignment="Top"/>
+                        <TextBlock local:Segments.Source="{Binding Segments}" FontSize="13.5" TextWrapping="Wrap"
+                                   Foreground="{StaticResource Text2Brush}" LineHeight="20"/>
+                    </DockPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy message" Click="Copy_Click"/>
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+        <StackPanel x:Name="EmptyState" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+            <Viewbox Width="38" Height="38" Opacity="0.35" HorizontalAlignment="Center">
+                <Path Style="{StaticResource Icon}" Data="{StaticResource IconChat}" Stroke="{StaticResource TextBrush}" StrokeThickness="1.6"/>
+            </Viewbox>
+            <TextBlock x:Name="EmptyTitle" Style="{StaticResource ItemTitle}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+            <TextBlock x:Name="EmptySub" Style="{StaticResource Sub}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Button x:Name="JumpBtn" Grid.Row="2" Style="{StaticResource ChipButton}" FontFamily="{StaticResource UiFont}" Height="30"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,12" Visibility="Collapsed"
+                Content="New messages ↓" Click="Jump_Click"/>
+
+        <!-- Say / commands -->
+        <Border Grid.Row="3" Margin="0,10,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="10">
+            <StackPanel>
+            <TextBlock x:Name="SendError" Foreground="{StaticResource DangerBrush}" FontSize="12" Margin="4,0,0,8" TextWrapping="Wrap"
+                       Visibility="Collapsed"/>
+            <DockPanel>
+                <Button x:Name="SendBtn" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Height="40" Padding="20,0"
+                        Content="Send" Margin="10,0,0,0" Click="Send_Click"/>
+                <Button x:Name="AsBtn" DockPanel.Dock="Left" Style="{StaticResource OutlineButton}" Height="40" Padding="14,0" FontSize="13"
+                        Margin="0,0,10,0" Click="As_Click" ToolTip="Which of your slots sends the message">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="as " Foreground="{StaticResource SubBrush}" FontWeight="Normal"/>
+                        <TextBlock x:Name="AsText" FontWeight="SemiBold"/>
+                        <Viewbox Width="10" Height="10" Margin="8,1,0,0">
+                            <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource Text2Brush}" StrokeThickness="3"/>
+                        </Viewbox>
+                    </StackPanel>
+                </Button>
+                <TextBox x:Name="Input" Style="{StaticResource Field}" MinHeight="40" FontSize="13.5"
+                         Tag="Message the room, or a command like !hint Hookshot" KeyDown="Input_KeyDown"/>
+            </DockPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

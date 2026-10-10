@@ -12,8 +12,15 @@ public sealed class AppConfig
     public List<Multiworld> Multiworlds { get; set; } = new();
     public string? ActiveMultiworldId { get; set; }
 
-    /// <summary>Last focused slot (SlotRef.Id), or null for the all-games overview.</summary>
-    public string? FocusedSlotId { get; set; }
+    /// <summary>Multiworlds kept connected in the background (reconnected on startup).</summary>
+    public List<string> ConnectedMultiworldIds { get; set; } = new();
+
+    /// <summary>Per multiworld: the focused slot (SlotRef.Id). Missing = the all-games overview.</summary>
+    public Dictionary<string, string> FocusByWorld { get; set; } = new();
+
+    // ---- feed view
+    public bool FeedOnlyMine { get; set; }
+    public string FeedFilter { get; set; } = "All";
 
     /// <summary>Archipelago game name → box art URL picked by the user.</summary>
     public Dictionary<string, string> ArtOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
