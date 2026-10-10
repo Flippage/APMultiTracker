@@ -41,6 +41,7 @@ in one place, with a faster, cleaner interface.
 | 💬 **Feed** | The room's messages as they happen, like the Text Client: items sent, hints, chat and goals, colour-coded and filterable. Chat or `!hint` from any of your slots. |
 | 🌍 **Several multiworlds at once** | Save rooms with their server and slots (**Find slots in this room** lists everyone). Keep several connected and switch between them instantly. |
 | ⚙️ **Zero fuss engine** | One click installs the engine into Archipelago; the app starts and stops it for you. |
+| ⬆️ **Auto-updates** | Checks GitHub for new versions, downloads in the background and installs in one click. |
 
 <p align="center">
   <img src="docs/screenshots/focused.png" alt="One game focused" width="900">
@@ -61,7 +62,8 @@ location, region or entrance (close spellings are fine). It runs Universal Track
 Everything happening in the room, like Archipelago's Text Client: items sent (coloured by importance),
 hints, chat, goals and releases. Filter by Items, Hints, Chat or Activity, or turn on **Only my slots**.
 Type in the box at the bottom to chat or run server commands such as `!hint Hookshot` as any of your slots.
-Each message shows once, even though every tracked slot hears it, and the tracker's own connections are hidden.
+Messages involving any of your games are highlighted in green. Each message shows once, even though every tracked
+slot hears it, and the tracker's own connections are hidden.
 
 <p align="center">
   <img src="docs/screenshots/feed.png" alt="The room's message feed" width="900">
@@ -72,6 +74,13 @@ Each message shows once, even though every tracked slot hears it, and the tracke
 Every multiworld you **Activate** stays connected in the background. The sidebar, Tracker and Feed show the active
 one; use **Switch multiworld** on the Tracker (or **Switch to** on Multiworlds) to jump between them instantly, with
 no reloading. **Disconnect** stops tracking one. Connected multiworlds reconnect when you start the app.
+
+## Updates
+
+APMultiTracker checks GitHub for new releases a few seconds after it starts and every 6 hours. Updates download in
+the background, are verified against GitHub's SHA-256 checksum, and install with **Update now** (the app restarts by
+itself). Turn on **Update automatically on next launch** in Settings → Updates to have them installed for you.
+Your multiworlds and settings are kept. The tracker engine inside Archipelago updates itself to match.
 
 ## Requirements
 

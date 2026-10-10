@@ -313,12 +313,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
     // ------------------------------------------------------------------ explain / logical path
 
-    /// <summary>The engine adds "(alias)" to some names; UT looks locations up by their real name.</summary>
-    private static string BaseName(CheckItem c)
-    {
-        int i = c.Name.LastIndexOf(" (", StringComparison.Ordinal);
-        return i > 0 && c.Name.EndsWith(')') ? c.Name[..i] : c.Name;
-    }
+    /// <summary>UT looks locations up by their real name (the shown name may carry an alias).</summary>
+    private static string BaseName(CheckItem c) => c.LookupName;
 
     private void CtxExplain_Click(object sender, RoutedEventArgs e)
     {
@@ -362,8 +358,21 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                 ["cmd"] = "explain", ["id"] = slot.Ref.Id, ["query"] = query, ["mode"] = mode,
             }, TimeSpan.FromSeconds(60));
             if (seq != _explainSeq) return;
+            if (reply?["type"]?.GetValue<string>() == "error")
+            {
+                string msg = reply["message"]?.GetValue<string>() ?? "Unknown error";
+                Log.Warn("explain", $"{mode} '{query}' failed: {msg}");
+                ShowExplain("Couldn't do that: " + msg, "red");
+                return;
+            }
             if (reply?["lines"] is not JsonArray lines) { ShowExplain("No answer from the engine.", "red"); return; }
-            RenderExplain(mode, query, lines);
+            if (lines.Count == 0) { ShowExplain("Universal Tracker had nothing to say about that.", null); return; }
+            try { RenderExplain(mode, query, lines); }
+            catch (Exception ex)
+            {
+                Log.Error("explain", $"Couldn't show {mode} for '{query}'", ex);
+                ShowExplain("Couldn't show the answer: " + ex.Message, "red");
+            }
         }
         finally
         {
@@ -390,8 +399,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                                          Foreground = (Brush)FindResource("Text2Brush") };
                 foreach (var seg in line.OfType<JsonObject>())
                 {
-                    var run = new System.Windows.Documents.Run(seg["text"]?.GetValue<string>() ?? "");
-                    if (ExplainColor(seg["color"]?.GetValue<string>()) is Brush b) run.Foreground = b;
+                    var run = new System.Windows.Documents.Run(seg["text"]?.ToString() ?? "");
+                    if (ExplainColor(seg["color"]?.ToString()) is Brush b) run.Foreground = b;
                     tb.Inlines.Add(run);
                 }
                 ExplainOutput.Children.Add(tb);

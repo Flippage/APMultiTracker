@@ -10,7 +10,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>APMultiTracker</RootNamespace>
     <AssemblyName>APMultiTracker</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Product>APMultiTracker</Product>
     <Description>Tracks every game in your Archipelago multiworld in one window.</Description>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -24,6 +24,11 @@
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets the updater pick the matching release file (standalone vs small) -->
+    <AssemblyMetadata Include="SelfContained" Value="$(SelfContained)" />
   </ItemGroup>
 
   <!--

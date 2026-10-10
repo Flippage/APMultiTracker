@@ -387,6 +387,7 @@ class SlotContext(CommonContext):
             locations.append({
                 "id": loc_id,
                 "name": label,
+                "key": name,  # the real location name (label may carry an alias), used for explain/path
                 "region": self.region_by_name.get(name, ""),
                 "status": status,
                 "excluded": bool(loc is not None and loc.progress_type == LocationProgressType.EXCLUDED),
@@ -449,18 +450,35 @@ class SlotContext(CommonContext):
                 TrackerClient.explain(shim, query)
         except Exception as e:
             log.error(traceback.format_exc())
-            shim.messages.append([{"type": "color", "color": "red", "text": f"Couldn't explain that: {e}"}])
+            shim.messages.append([{"type": "color", "color": "red", "text": f"Universal Tracker couldn't do that: {e}"}])
         finally:
             client_log.removeHandler(capture)
-        lines = [self._render(parts) for parts in shim.messages if parts]
+        lines = []
+        for parts in shim.messages:
+            try:
+                rendered = self._render(parts)
+            except Exception as e:
+                log.error(traceback.format_exc())
+                rendered = [{"text": f"(couldn't show part of the answer: {e})", "color": "red"}]
+            if rendered:
+                lines.append(rendered)
         return lines or [[{"text": "Nothing to explain.", "color": ""}]]
 
     def _render(self, parts, own_slots: frozenset = frozenset()) -> list[dict]:
         """AP JSON message parts → plain segments the app can colour (names resolved here)."""
-        if isinstance(parts, dict):
-            parts = [parts]
+        def flatten(value):
+            if value is None:
+                return
+            if isinstance(value, (list, tuple)):
+                for v in value:
+                    yield from flatten(v)
+            elif isinstance(value, dict):
+                yield value
+            else:
+                yield {"type": "text", "text": str(value)}
+
         out = []
-        for p in parts:
+        for p in flatten(parts):
             kind = p.get("type", "text")
             text = str(p.get("text", ""))
             color = p.get("color", "") if kind == "color" else ""
@@ -723,11 +741,16 @@ class Engine:
             await ws.send(json.dumps({"type": "feed_backlog", "room": room, "messages": list(messages)}))
         try:
             async for raw in ws:
+                msg = None
                 try:
-                    await self.command(ws, json.loads(raw))
+                    msg = json.loads(raw)
+                    await self.command(ws, msg)
                 except Exception as e:
                     log.error(traceback.format_exc())
-                    await ws.send(json.dumps({"type": "error", "message": str(e)}))
+                    reply = {"type": "error", "message": str(e)}
+                    if isinstance(msg, dict) and msg.get("req") is not None:
+                        reply["req"] = msg["req"]
+                    await ws.send(json.dumps(reply))
         except websockets.ConnectionClosed:
             pass
         finally:

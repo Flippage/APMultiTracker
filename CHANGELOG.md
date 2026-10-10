@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.0
+
+- **Built-in updates**, like AutoSwitcher: checks GitHub for new versions, downloads in the background (verified
+  against GitHub's SHA-256 checksum) and installs with one click, or automatically on the next launch.
+  An "Update" badge and a toast let you know. See Settings → Updates.
+- **Feed highlights your games**: any message involving one of the active multiworld's slots is highlighted green.
+- **Feed is now the first item** in the sidebar (Feed, Tracker, Multiworlds, Settings).
+- **App-styled menus**: right-click and dropdown menus match the rest of the app (no more white side bars),
+  and always open to the right.
+- **Explain / logical path fixes**: checks whose names end in brackets (e.g. "(Huge)") are now looked up by their
+  real name, and any error from Universal Tracker or a world is shown instead of nothing happening.
+
 ## v0.2.0
 
 - **Feed**: a new page with the room's messages as they happen, like the Text Client. Items sent (coloured by

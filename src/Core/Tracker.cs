@@ -12,8 +12,10 @@ using System.Windows.Media;
 namespace APMultiTracker;
 
 /// <summary>One location that hasn't been checked yet.</summary>
-public sealed record CheckItem(long Id, string Name, string Region, string Status, bool Excluded, string? Hint)
+public sealed record CheckItem(long Id, string Name, string Region, string Status, bool Excluded, string? Hint, string? Key = null)
 {
+    /// <summary>The location's real name (Name may include an alias), for explain / logical path.</summary>
+    public string LookupName => string.IsNullOrEmpty(Key) ? Name : Key;
     public bool IsHidden => Status == "ignored";
     public bool IsInLogic => Status == "in_logic";
     public bool IsGlitched => Status == "glitched";
@@ -188,7 +190,8 @@ public sealed class SlotView : INotifyPropertyChanged
                     o["region"]?.GetValue<string>() ?? "",
                     o["status"]?.GetValue<string>() ?? "out_of_logic",
                     o["excluded"]?.GetValue<bool>() ?? false,
-                    o["hint"]?.GetValue<string>()));
+                    o["hint"]?.GetValue<string>(),
+                    o["key"]?.GetValue<string>()));
             }
         Locations = locs;
 

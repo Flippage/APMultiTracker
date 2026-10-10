@@ -14,6 +14,7 @@ public partial class App : Application
     public static TwitchService Twitch { get; private set; } = null!;
     public static EngineHost Engine { get; private set; } = null!;
     public static TrackerStore Tracker { get; private set; } = null!;
+    public static Updater Updater { get; private set; } = null!;
     public static bool IsExiting { get; private set; }
     public static bool DemoMode { get; private set; }
 
@@ -58,6 +59,10 @@ public partial class App : Application
         }
 
         base.OnStartup(e);
+        // Menus open to the right of the cursor, even on PCs set up for "right-handed" (tablet) menus.
+        if (SystemParameters.MenuDropAlignment)
+            typeof(SystemParameters).GetField("_menuDropAlignment",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)?.SetValue(null, false);
         DispatcherUnhandledException += (_, args) =>
         {
             args.Handled = true;
@@ -90,9 +95,17 @@ public partial class App : Application
         }
         else Config = ConfigStore.Load();
 
+        // "Update automatically on next launch": swap in the downloaded version before any UI appears.
+        if (!DemoMode && Updater.TryInstallOnLaunch(Config))
+        {
+            RestartInto(Environment.ProcessPath!, "");
+            return;
+        }
+
         Twitch = new TwitchService();
         Engine = new EngineHost(Dispatcher);
         Tracker = new TrackerStore(Engine);
+        Updater = new Updater(Config);
         Engine.Changed += () =>
         {
             if (Engine.State != EngineState.Running) Tracker.MarkAllOffline();
@@ -119,6 +132,7 @@ public partial class App : Application
     private async Task InitAsync()
     {
         try { await Twitch.InitAsync(); } catch { }
+        Updater.Start();
         Engine.Detect();
         await Engine.StartAsync();
     }
@@ -185,6 +199,21 @@ public partial class App : Application
         if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
         w.Activate();
         if (!Config.AlwaysOnTop) { w.Topmost = true; w.Topmost = false; }
+    }
+
+    /// <summary>Exit and start <paramref name="exePath"/> (used after installing an update).</summary>
+    public void RestartInto(string exePath, string args)
+    {
+        IsExiting = true;
+        try { if (Config != null) ConfigStore.Save(Config); } catch { }
+        Engine?.KillNow();
+        // Free the single-instance lock first, or the new process would just hand off to us and quit.
+        try { _mutex?.ReleaseMutex(); } catch { }
+        _mutex?.Dispose();
+        _mutex = null;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exePath, args) { UseShellExecute = false }); }
+        catch { }
+        Shutdown();
     }
 
     public void ExitApp()

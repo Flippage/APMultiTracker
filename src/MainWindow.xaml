@@ -80,7 +80,6 @@
                 </Border>
 
                 <StackPanel x:Name="NavMenu" VerticalAlignment="Top">
-                    <RadioButton x:Name="NavTracker" Style="{StaticResource NavButton}" Content="Tracker" Tag="{StaticResource IconTarget}" Checked="Nav_Checked"/>
                     <Grid>
                         <RadioButton x:Name="NavFeed" Style="{StaticResource NavButton}" Content="Feed" Tag="{StaticResource IconChat}" Checked="Nav_Checked"/>
                         <Border x:Name="FeedBadge" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
@@ -90,9 +89,16 @@
                             <TextBlock x:Name="FeedBadgeText" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                         </Border>
                     </Grid>
+                    <RadioButton x:Name="NavTracker" Style="{StaticResource NavButton}" Content="Tracker" Tag="{StaticResource IconTarget}" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavMultiworlds" Style="{StaticResource NavButton}" Content="Multiworlds" Tag="{StaticResource IconGlobe}" Checked="Nav_Checked"/>
                     <Grid>
                         <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" Content="Settings" Tag="{StaticResource IconGear}" Checked="Nav_Checked"/>
+                        <Border x:Name="UpdateBadge" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                                CornerRadius="8" Padding="7,1,7,2" Background="{StaticResource WarnBgBrush}"
+                                BorderBrush="{StaticResource WarnLineBrush}" BorderThickness="1"
+                                IsHitTestVisible="False" Visibility="Collapsed">
+                            <TextBlock Text="Update" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource WarnBrush}"/>
+                        </Border>
                         <Border x:Name="SetupBadge" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
                                 CornerRadius="8" Padding="7,1,7,2" Background="{StaticResource WarnBgBrush}"
                                 BorderBrush="{StaticResource WarnLineBrush}" BorderThickness="1"
@@ -105,6 +111,48 @@
         </Border>
 
         <ContentControl x:Name="Host" Grid.Column="1" Focusable="False"/>
+
+        <!-- In-app update toast (bottom-right, 10 s, pauses on hover) -->
+        <Border x:Name="UpdateToast" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24"
+                Width="360" CornerRadius="14" Background="#1A1A1A" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                Visibility="Collapsed" MouseEnter="Toast_MouseEnter" MouseLeave="Toast_MouseLeave">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="8" Opacity="0.6" Color="Black"/>
+            </Border.Effect>
+            <Grid ClipToBounds="True">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="3"/>
+                </Grid.RowDefinitions>
+                <DockPanel Margin="16,16,12,14">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Tag="{StaticResource IconClose}"
+                            Width="32" Height="32" VerticalAlignment="Top" ToolTip="Dismiss" Click="ToastClose_Click"/>
+                    <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="10" Background="{StaticResource AccentDimBrush}"
+                            VerticalAlignment="Top" Margin="0,0,14,0">
+                        <Viewbox Width="20" Height="20">
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconDownload}" Stroke="{StaticResource AccentBrush}" StrokeThickness="2.2"/>
+                        </Viewbox>
+                    </Border>
+                    <StackPanel>
+                        <TextBlock Text="A new update is available" FontSize="14.5" FontWeight="Bold"/>
+                        <TextBlock x:Name="ToastText" FontSize="12.5" Foreground="#B5B5B5" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource AccentButton}" Height="34" Padding="16,0" FontSize="13" Content="Update now"
+                                    Click="ToastUpdate_Click"/>
+                            <Button Style="{StaticResource OutlineButton}" Height="34" Padding="14,0" FontSize="13" FontWeight="Normal"
+                                    Foreground="{StaticResource Text2Brush}" Content="What's new" Margin="8,0,0,0" Click="ToastNotes_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+                <Border Grid.Row="1" Background="{StaticResource AccentDimBrush}">
+                    <Border Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ToastBarScale" ScaleX="1"/>
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Grid>
+        </Border>
 
         <!-- Box art picker -->
         <Grid x:Name="ArtLayer" Grid.ColumnSpan="2" Visibility="Collapsed">

@@ -27,6 +27,9 @@ public partial class MainWindow : Window
         Topmost = App.Config.AlwaysOnTop;
 
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateEngineChip);
+        App.Updater.Changed += () => Dispatcher.InvokeAsync(UpdateUpdateBadge);
+        App.Updater.Notice += downloaded => Dispatcher.InvokeAsync(() => QueueUpdateToast(downloaded));
+        IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) ShowQueuedToast(); };
         App.Tracker.Changed += slot => { if (slot == null || App.Tracker.Focused == null || slot == App.Tracker.Focused) UpdateFocusCard(); };
         App.Tracker.FocusChanged += UpdateFocusCard;
         App.Tracker.FeedAdded += (world, m) =>
@@ -42,6 +45,7 @@ public partial class MainWindow : Window
 
         UpdateEngineChip();
         UpdateFocusCard();
+        UpdateUpdateBadge();
         NavTracker.IsChecked = true;
     }
 
@@ -134,6 +138,7 @@ public partial class MainWindow : Window
         EngineDot.Fill = EngineGlow.Fill = dot;
         bool needsSetup = !App.DemoMode && e.State is EngineState.NoArchipelago or EngineState.NoTracker or EngineState.NotInstalled or EngineState.Error;
         SetupBadge.Visibility = needsSetup ? Visibility.Visible : Visibility.Collapsed;
+        UpdateUpdateBadge();
         EngineChip.ToolTip = string.IsNullOrEmpty(e.Detail) ? "Engine settings" : e.Detail;
     }
 
@@ -248,6 +253,65 @@ public partial class MainWindow : Window
     private void ArtClose_Click(object sender, RoutedEventArgs e) => ArtLayer.Visibility = Visibility.Collapsed;
     private void ArtBackdrop_MouseDown(object sender, MouseButtonEventArgs e) => ArtLayer.Visibility = Visibility.Collapsed;
 
+    // ------------------------------------------------------------------ updates
+
+    private void UpdateUpdateBadge()
+    {
+        bool setup = SetupBadge.Visibility == Visibility.Visible;
+        UpdateBadge.Visibility = App.Updater.HasUpdate && !setup ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private bool? _queuedToast;          // null = none; true = downloaded; false = available
+    private AnimationClock? _toastClock;
+
+    private void QueueUpdateToast(bool downloaded)
+    {
+        _queuedToast = downloaded;
+        if (IsVisible && WindowState != WindowState.Minimized) ShowQueuedToast();
+    }
+
+    private void ShowQueuedToast()
+    {
+        if (_queuedToast is not bool downloaded) return;
+        _queuedToast = null;
+        string tag = App.Updater.LatestTag ?? "A new version";
+        ToastText.Text = downloaded
+            ? $"APMultiTracker {tag} is downloaded and ready to install."
+            : $"APMultiTracker {tag} is available to download and install.";
+        UpdateToast.Visibility = Visibility.Visible;
+        UpdateToast.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)));
+        var drain = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(10));
+        _toastClock = drain.CreateClock();
+        _toastClock.Completed += (_, _) => HideToast();
+        ToastBarScale.ApplyAnimationClock(ScaleTransform.ScaleXProperty, _toastClock);
+    }
+
+    private void HideToast()
+    {
+        if (UpdateToast.Visibility != Visibility.Visible) return;
+        var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(180));
+        fade.Completed += (_, _) =>
+        {
+            UpdateToast.Visibility = Visibility.Collapsed;
+            UpdateToast.BeginAnimation(OpacityProperty, null);
+        };
+        UpdateToast.BeginAnimation(OpacityProperty, fade);
+        _toastClock?.Controller?.Stop();
+        _toastClock = null;
+    }
+
+    private void Toast_MouseEnter(object sender, MouseEventArgs e) => _toastClock?.Controller?.Pause();
+    private void Toast_MouseLeave(object sender, MouseEventArgs e) => _toastClock?.Controller?.Resume();
+    private void ToastClose_Click(object sender, RoutedEventArgs e) => HideToast();
+    private void ToastNotes_Click(object sender, RoutedEventArgs e) => App.Updater.OpenReleaseNotes();
+
+    private void ToastUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        HideToast();
+        GoToSettings();                     // show progress there
+        _ = App.Updater.UpdateNowAsync();
+    }
+
     // ------------------------------------------------------------------ in-app confirmation
 
     private TaskCompletionSource<bool>? _confirm;
@@ -315,6 +379,9 @@ public partial class MainWindow : Window
             await Task.Delay(50);
         }
         _tracker.SelfTest();
+        QueueUpdateToast(true);
+        UpdateLayout();
+        HideToast();
         OpenArtPicker("Hollow Knight");
         UpdateLayout();
         ArtLayer.Visibility = Visibility.Collapsed;

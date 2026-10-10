@@ -24,15 +24,18 @@ public partial class SettingsPage : UserControl
         _countdown.Tick += (_, _) => UpdateCountdown();
         App.Twitch.AuthChanged += () => Dispatcher.InvokeAsync(UpdateAccount);
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateEngine);
+        App.Updater.Changed += () => Dispatcher.InvokeAsync(UpdateUpdates);
         IsVisibleChanged += (_, e) =>
         {
             if (!(bool)e.NewValue) return;
             if (!App.DemoMode && !App.Engine.Client.IsConnected) App.Engine.Detect();
             UpdateEngine();
             UpdateAccount();
+            UpdateUpdates();
         };
         UpdateEngine();
         UpdateAccount();
+        UpdateUpdates();
     }
 
     // ------------------------------------------------------------ engine
@@ -173,6 +176,100 @@ public partial class SettingsPage : UserControl
     {
         if (!_loading) App.SetStartup(StartupToggle.IsChecked == true);
     }
+
+    // ------------------------------------------------------------ updates
+
+    private void UpdateUpdates()
+    {
+        var u = App.Updater;
+        string tag = u.LatestTag ?? "";
+        string cur = Updater.CurrentTag;
+        string title, sub, color, bg;
+        Geometry icon = (Geometry)FindResource("IconDownload");
+        bool showNow = false, showNotes = false, showCheck = false, showBar = false;
+
+        switch (u.State)
+        {
+            case UpdateState.Available:
+                title = $"Update available \u00b7 {tag}";
+                sub = "Click Update now to download and install. APMultiTracker restarts by itself.";
+                color = "WarnBrush"; bg = "WarnBgBrush"; showNow = showNotes = true;
+                break;
+            case UpdateState.Ready:
+                title = $"{tag} downloaded \u00b7 ready to install";
+                sub = App.Config.AutoDownloadUpdates && App.Config.InstallUpdatesOnLaunch
+                    ? "Installs automatically next time APMultiTracker starts, or click Update now."
+                    : "Click Update now to install. APMultiTracker restarts by itself.";
+                color = "WarnBrush"; bg = "WarnBgBrush"; showNow = showNotes = true;
+                break;
+            case UpdateState.Downloading:
+                title = $"Downloading {tag}\u2026 {u.Progress * 100:0}%";
+                sub = "Verified against GitHub's SHA-256 checksum when finished.";
+                color = "AccentBrush"; bg = "AccentDimBrush"; showBar = true;
+                break;
+            case UpdateState.Installing:
+                title = $"Installing {tag}\u2026";
+                sub = "APMultiTracker will close and reopen in a moment.";
+                color = "AccentBrush"; bg = "AccentDimBrush"; icon = (Geometry)FindResource("IconRefresh");
+                break;
+            case UpdateState.Checking:
+                title = "Checking for updates\u2026";
+                sub = $"You're on {cur}.";
+                color = "AccentBrush"; bg = "AccentDimBrush"; icon = (Geometry)FindResource("IconRefresh");
+                break;
+            case UpdateState.Error:
+                title = "Update failed";
+                sub = u.Error ?? "Something went wrong.";
+                color = "DangerBrush"; bg = "WarnBgBrush"; showCheck = true;
+                break;
+            default:
+                title = $"You're up to date \u00b7 {cur}";
+                sub = "Your multiworlds and settings are kept across updates.";
+                color = "GoodBrush"; bg = "CardBrush"; icon = (Geometry)FindResource("IconCheck"); showCheck = true;
+                break;
+        }
+
+        UpdTitle.Text = title;
+        UpdSub.Text = sub;
+        UpdIcon.Data = icon;
+        UpdIcon.Stroke = (Brush)FindResource(color);
+        UpdIconBox.Background = u.State is UpdateState.UpToDate or UpdateState.Idle
+            ? new SolidColorBrush(Color.FromRgb(0x10, 0x29, 0x1A)) : (Brush)FindResource(bg);
+        UpdStatusRow.BorderBrush = (Brush)FindResource(color);
+        UpdNowBtn.Visibility = showNow ? Visibility.Visible : Visibility.Collapsed;
+        UpdNotesBtn.Visibility = showNotes ? Visibility.Visible : Visibility.Collapsed;
+        UpdCheckBtn.Visibility = showCheck ? Visibility.Visible : Visibility.Collapsed;
+        UpdBarTrack.Visibility = showBar ? Visibility.Visible : Visibility.Collapsed;
+        UpdBarScale.ScaleX = Math.Clamp(u.Progress, 0, 1);
+        UpdFooter.Text = u.LastChecked is DateTime t
+            ? $"Current version {cur} \u00b7 last checked {t:h:mm tt}"
+            : $"Current version {cur}";
+
+        _loading = true;
+        AutoDlToggle.IsChecked = App.Config.AutoDownloadUpdates;
+        AutoInstallToggle.IsChecked = App.Config.AutoDownloadUpdates && App.Config.InstallUpdatesOnLaunch;
+        AutoInstallToggle.IsEnabled = App.Config.AutoDownloadUpdates;
+        AutoInstallRow.Opacity = App.Config.AutoDownloadUpdates ? 1 : 0.45;
+        AutoInstallSub.Text = App.Config.AutoDownloadUpdates
+            ? "Installs a downloaded update the next time APMultiTracker starts."
+            : "Needs \u201CAutomatically download new versions\u201D turned on.";
+        _loading = false;
+    }
+
+    private void UpdPrefs_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Config.AutoDownloadUpdates = AutoDlToggle.IsChecked == true;
+        if (App.Config.AutoDownloadUpdates)
+            App.Config.InstallUpdatesOnLaunch = AutoInstallToggle.IsChecked == true;
+        App.SaveConfig();
+        UpdateUpdates();
+        if (App.Config.AutoDownloadUpdates && App.Updater.State == UpdateState.Available) _ = App.Updater.CheckAsync();
+    }
+
+    private async void UpdNow_Click(object sender, RoutedEventArgs e) => await App.Updater.UpdateNowAsync();
+    private async void UpdCheck_Click(object sender, RoutedEventArgs e) => await App.Updater.CheckAsync(manual: true);
+    private void UpdNotes_Click(object sender, RoutedEventArgs e) => App.Updater.OpenReleaseNotes();
 
     // ------------------------------------------------------------ twitch
 

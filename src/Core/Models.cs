@@ -30,6 +30,11 @@ public sealed class AppConfig
     public bool GroupByRegion { get; set; } = true;
     public bool ShowRegionNames { get; set; } = true;
 
+    // ---- updates
+    public bool AutoDownloadUpdates { get; set; } = true;
+    public bool InstallUpdatesOnLaunch { get; set; }
+    public PendingUpdate? PendingUpdate { get; set; }
+
     // ---- app
     public bool StartWithWindows { get; set; }
     public bool AlwaysOnTop { get; set; }
@@ -66,6 +71,13 @@ public sealed class TokenSet
     public string Login { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string ProfileImageUrl { get; set; } = "";
+}
+
+/// <summary>An update that's been downloaded and verified, waiting to be installed.</summary>
+public sealed class PendingUpdate
+{
+    public string Version { get; set; } = "";
+    public string ExePath { get; set; } = "";
 }
 
 public sealed record DeviceCode(string Code, string UserCode, string VerificationUri, int ExpiresIn, int Interval);

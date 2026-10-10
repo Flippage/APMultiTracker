@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -9,10 +10,15 @@ using System.Windows.Media;
 
 namespace APMultiTracker;
 
+/// <summary>A feed message as shown: highlighted when it involves one of the active multiworld's slots.</summary>
+public sealed record FeedRow(FeedMessage Message, bool Mine);
+
 /// <summary>The room's messages as they happen (like Archipelago's Text Client), for the active multiworld.</summary>
 public partial class FeedPage : UserControl
 {
-    private readonly ObservableCollection<FeedMessage> _shown = new();
+    private readonly ObservableCollection<FeedRow> _shown = new();
+    private HashSet<int> _mine = new();
+    private string _mineKey = "";
     private LiveWorld? _world;
     private ScrollViewer? _scroll;
     private bool _atBottom = true;
@@ -24,7 +30,12 @@ public partial class FeedPage : UserControl
         InitializeComponent();
         List.ItemsSource = _shown;
         App.Tracker.WorldsChanged += () => { if (IsVisible) Rebuild(); };
-        App.Tracker.Changed += _ => { if (IsVisible) UpdateAs(); };
+        App.Tracker.Changed += _ =>
+        {
+            if (!IsVisible) return;
+            UpdateAs();
+            if (MineKey() != _mineKey) Rebuild();   // slot numbers became known: re-highlight
+        };
         App.Tracker.FeedAdded += OnFeedAdded;
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) { Rebuild(); ScrollToEnd(); } };
         Loaded += (_, _) => _scroll ??= FindScroll(List);
@@ -44,6 +55,11 @@ public partial class FeedPage : UserControl
 
     // ------------------------------------------------------------------ list
 
+    /// <summary>Slot numbers of the active multiworld's games (known once each slot has connected).</summary>
+    private string MineKey() => string.Join(",", (App.Tracker.ActiveLive?.Slots ?? new()).Select(s => s.SlotNumber).Where(n => n > 0).OrderBy(n => n));
+
+    private bool IsMine(FeedMessage m) => _mine.Count > 0 && m.Players.Any(_mine.Contains);
+
     private bool Passes(FeedMessage m)
     {
         bool kind = App.Config.FeedFilter switch
@@ -56,15 +72,16 @@ public partial class FeedPage : UserControl
         };
         if (!kind) return false;
         if (!App.Config.FeedOnlyMine || _world == null) return true;
-        var mine = _world.Slots.Where(s => s.SlotNumber > 0).Select(s => s.SlotNumber).ToHashSet();
-        return mine.Count == 0 || m.Players.Any(mine.Contains);
+        return _mine.Count == 0 || IsMine(m);
     }
 
     private void Rebuild()
     {
         _world = App.Tracker.ActiveLive;
+        _mineKey = MineKey();
+        _mine = _mineKey.Length == 0 ? new() : _mineKey.Split(',').Select(int.Parse).ToHashSet();
         _shown.Clear();
-        if (_world != null) foreach (var m in _world.Feed) if (Passes(m)) _shown.Add(m);
+        if (_world != null) foreach (var m in _world.Feed) if (Passes(m)) _shown.Add(new FeedRow(m, IsMine(m)));
         SubText.Text = _world == null ? "No multiworld active"
                      : $"{_world.World.Name} · {_world.World.Server} · {_world.Feed.Count} message{(_world.Feed.Count == 1 ? "" : "s")}";
         UpdateEmpty();
@@ -78,7 +95,7 @@ public partial class FeedPage : UserControl
         SubText.Text = $"{world.World.Name} · {world.World.Server} · {world.Feed.Count} messages";
         if (!Passes(m)) return;
         while (_shown.Count >= LiveWorld.FeedLimit) _shown.RemoveAt(0);
-        _shown.Add(m);
+        _shown.Add(new FeedRow(m, IsMine(m)));
         UpdateEmpty();
         if (_atBottom) ScrollToEnd();
         else JumpBtn.Visibility = Visibility.Visible;
@@ -145,7 +162,7 @@ public partial class FeedPage : UserControl
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        if (List.SelectedItem is FeedMessage m) try { Clipboard.SetText(m.Text); } catch { }
+        if (List.SelectedItem is FeedRow r) try { Clipboard.SetText(r.Message.Text); } catch { }
     }
 
     // ------------------------------------------------------------------ sending

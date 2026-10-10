@@ -37,13 +37,22 @@
 
         <ListBox x:Name="List" Grid.Row="2" Style="{StaticResource CheckList}" ScrollViewer.ScrollChanged="List_ScrollChanged">
             <ListBox.ItemTemplate>
-                <DataTemplate DataType="{x:Type local:FeedMessage}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Left" Text="{Binding TimeText}" Style="{StaticResource Mono}" FontSize="11"
-                                   Foreground="#6A6A6A" Width="46" Margin="0,2,6,0" VerticalAlignment="Top"/>
-                        <TextBlock local:Segments.Source="{Binding Segments}" FontSize="13.5" TextWrapping="Wrap"
-                                   Foreground="{StaticResource Text2Brush}" LineHeight="20"/>
-                    </DockPanel>
+                <DataTemplate DataType="{x:Type local:FeedRow}">
+                    <Border x:Name="Bd" CornerRadius="6" Padding="9,4,8,4" Margin="-6,0,0,0" BorderThickness="3,0,0,0"
+                            BorderBrush="Transparent" Background="Transparent">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Text="{Binding Message.TimeText}" Style="{StaticResource Mono}" FontSize="11"
+                                       Foreground="#6A6A6A" Width="46" Margin="0,2,6,0" VerticalAlignment="Top"/>
+                            <TextBlock local:Segments.Source="{Binding Message.Segments}" FontSize="13.5" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Text2Brush}" LineHeight="20"/>
+                        </DockPanel>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding Mine}" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource InLogicDimBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource InLogicBrush}"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
                 </DataTemplate>
             </ListBox.ItemTemplate>
             <ListBox.ContextMenu>
