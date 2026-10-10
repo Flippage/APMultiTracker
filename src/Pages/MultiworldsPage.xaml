@@ -1,0 +1,103 @@
+<UserControl x:Class="APMultiTracker.MultiworldsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:APMultiTracker">
+    <Grid Margin="32,26,32,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Click="New_Click">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="14" Height="14" Margin="0,0,8,0">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconPlus}" Stroke="Black" StrokeThickness="3"/>
+                    </Viewbox>
+                    <TextBlock Text="New multiworld"/>
+                </StackPanel>
+            </Button>
+            <TextBlock Text="Multiworlds" Style="{StaticResource H1}" VerticalAlignment="Center"/>
+        </DockPanel>
+        <TextBlock Grid.Row="1" Style="{StaticResource Sub}" FontSize="13.5" Margin="0,8,0,0" TextWrapping="Wrap"
+                   Text="Save each room you play in: its server and the slots you want to track. Activate one to track all of its games at once."/>
+
+        <ScrollViewer Grid.Row="2" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="WorldList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:MultiworldRow}">
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="18,14,10,14" Margin="0,0,0,10"
+                                BorderThickness="2" BorderBrush="{Binding Outline}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
+                                                Content="Activate" Visibility="{Binding ActivateVis}" Margin="0,0,8,0"
+                                                CommandParameter="{Binding World}" Click="Activate_Click"
+                                                ToolTip="Track these games"/>
+                                        <Button Style="{StaticResource OutlineButton}" Height="36" Padding="16,0" FontSize="13"
+                                                Content="Deactivate" Visibility="{Binding ActiveVis}" Margin="0,0,8,0"
+                                                Foreground="{StaticResource AccentBrush}" BorderBrush="{StaticResource AccentLineBrush}"
+                                                Click="Deactivate_Click" ToolTip="Stop tracking this multiworld"/>
+                                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconPencil}" ToolTip="Edit"
+                                                CommandParameter="{Binding World}" Click="Edit_Click"/>
+                                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconCopy}" ToolTip="Duplicate"
+                                                CommandParameter="{Binding World}" Click="Duplicate_Click"/>
+                                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconTrash}" ToolTip="Delete"
+                                                CommandParameter="{Binding World}" Click="Delete_Click"/>
+                                    </StackPanel>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding World.Name}" Style="{StaticResource ItemTitle}" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+                                            <Border Visibility="{Binding ActiveVis}" CornerRadius="6" Padding="7,1,7,2" Margin="10,0,0,0"
+                                                    VerticalAlignment="Center" Background="{StaticResource AccentDimBrush}"
+                                                    BorderBrush="{StaticResource AccentLineBrush}" BorderThickness="1">
+                                                <TextBlock Text="ACTIVE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding CountText}" FontSize="12.5" Foreground="{StaticResource SubBrush}"
+                                                       VerticalAlignment="Center" Margin="10,1,0,0"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding World.Server}" Style="{StaticResource Mono}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Slots}" Margin="0,8,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type local:SlotChip}">
+                                            <Border CornerRadius="8" Padding="4,4,10,4" Margin="0,4,6,0" Background="#1F1F1F">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="21" Height="28" CornerRadius="3" local:Art.Url="{Binding ArtUrl}"/>
+                                                    <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Game}" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                                                   MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Name}" FontSize="10.5" Foreground="{StaticResource SubBrush}"
+                                                                   MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel x:Name="EmptyState" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <Viewbox Width="40" Height="40" Opacity="0.35" HorizontalAlignment="Center">
+                <Path Style="{StaticResource Icon}" Data="{StaticResource IconGlobe}" Stroke="{StaticResource TextBrush}" StrokeThickness="1.6"/>
+            </Viewbox>
+            <TextBlock Text="No multiworlds yet" Style="{StaticResource ItemTitle}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+            <TextBlock Text="Create one with your room's address and your slot names." Style="{StaticResource Sub}"
+                       HorizontalAlignment="Center" Margin="0,6,0,0"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

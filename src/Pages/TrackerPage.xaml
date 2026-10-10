@@ -1,0 +1,440 @@
+<UserControl x:Class="APMultiTracker.TrackerPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:APMultiTracker">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="Vis"/>
+
+        <!-- One check row (focused view) -->
+        <DataTemplate x:Key="CheckRow" DataType="{x:Type local:CheckItem}">
+            <Grid Background="Transparent" ToolTip="{Binding StatusTip}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" Margin="0,3,0,1">
+                        <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource HintDimBrush}">
+                            <TextBlock FontSize="11.5" Foreground="{StaticResource HintBrush}" TextTrimming="CharacterEllipsis">
+                                <Run Text="HINT"  FontWeight="Bold"/><Run Text="  "/><Run Text="{Binding Hint, Mode=OneWay}"/>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Region}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding DataContext.ShowRegionLine, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource Vis}}"/>
+                </StackPanel>
+                <Button x:Name="HideBtn" Grid.Column="2" Style="{StaticResource IconButton}" Width="30" Height="30" Opacity="0"
+                        Tag="{StaticResource IconEyeOff}" ToolTip="Hide this check (mark as done)" Click="ToggleHidden_Click"/>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter TargetName="HideBtn" Property="Opacity" Value="1"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                    <Setter TargetName="HideBtn" Property="Tag" Value="{StaticResource IconEye}"/>
+                    <Setter TargetName="HideBtn" Property="ToolTip" Value="Show this check again"/>
+                    <Setter TargetName="HideBtn" Property="Opacity" Value="1"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Compact check row (overview columns) -->
+        <DataTemplate x:Key="MiniRow" DataType="{x:Type local:CheckItem}">
+            <DockPanel ToolTip="{Binding Region}">
+                <Ellipse Width="6" Height="6" Fill="{Binding DotBrush}" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,9,0"/>
+                <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource HintDimBrush}"
+                        VerticalAlignment="Center" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" ToolTip="{Binding Hint}">
+                    <TextBlock Text="HINT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>
+                </Border>
+                <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+        </DataTemplate>
+
+        <!-- Game tile in the switcher -->
+        <DataTemplate x:Key="GameTile" DataType="{x:Type local:SlotView}">
+            <Grid Width="200">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <Border Width="36" Height="48" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
+                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,2,0">
+                        <TextBlock Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
+                                   HorizontalAlignment="Right"/>
+                    </StackPanel>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                            <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding StatusText}" FontSize="10.5" Foreground="{StaticResource SubBrush}" Margin="5,0,0,0"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+                <Border Grid.Row="1" Height="3" CornerRadius="2" Margin="0,8,0,0" Background="#262626">
+                    <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding Progress}"/>
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Margin="32,26,32,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="RefreshAllBtn" Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}" Margin="0,0,8,0"
+                        ToolTip="Rebuild logic for every game (re-reads YAMLs)" Click="RefreshAll_Click"/>
+                <Button Style="{StaticResource OutlineButton}" Padding="18,0" Click="Multiworlds_Click">
+                    <TextBlock Text="Switch multiworld" FontWeight="Normal" Foreground="{StaticResource Text2Brush}"/>
+                </Button>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock x:Name="TitleText" Text="Tracker" Style="{StaticResource H1}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="SubText" Style="{StaticResource Sub}" FontSize="13" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Setup / engine banner -->
+        <Border x:Name="Banner" Grid.Row="1" Margin="0,16,0,0" Padding="16,12" CornerRadius="12" Visibility="Collapsed"
+                Background="{StaticResource WarnBgBrush}" BorderBrush="{StaticResource WarnLineBrush}" BorderThickness="1">
+            <DockPanel>
+                <Button x:Name="BannerBtn" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
+                        Content="Open Settings" Click="BannerBtn_Click" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock x:Name="BannerTitle" FontWeight="Bold" Foreground="{StaticResource WarnTextBrush}"/>
+                    <TextBlock x:Name="BannerText" FontSize="12.5" Foreground="{StaticResource WarnTextBrush}" Opacity="0.85" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Game switcher -->
+        <DockPanel x:Name="Strip" Grid.Row="2" Margin="0,18,0,0">
+            <RadioButton x:Name="AllTile" Style="{StaticResource GameTab}" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,0,0,10"
+                         Checked="AllTile_Checked" ToolTip="All games (Ctrl+0)">
+                <Grid Width="96" Height="59">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconGrid}" Stroke="{StaticResource Text2Brush}"/>
+                            </Viewbox>
+                            <TextBlock Text="All games" FontSize="13" FontWeight="SemiBold" Margin="7,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="AllCount" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </RadioButton>
+            <ItemsControl x:Name="Tiles" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:SlotView}">
+                        <RadioButton Style="{StaticResource GameTab}" Margin="0,0,0,10" Content="{Binding}"
+                                     ContentTemplate="{StaticResource GameTile}" Checked="Tile_Checked" Loaded="Tile_Loaded"
+                                     ToolTip="{Binding StatusDetail}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DockPanel>
+
+        <!-- ===================== All games ===================== -->
+        <ScrollViewer x:Name="OverviewView" Grid.Row="3" Margin="0,8,0,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="Columns" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:SlotView}">
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="12" Margin="0,0,10,0" Padding="12,12,6,8">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Cursor="Hand" Background="Transparent" MouseLeftButtonUp="Column_Click"
+                                        ToolTip="Focus this game">
+                                    <DockPanel Margin="0,0,6,10">
+                                        <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold"
+                                                   Foreground="{StaticResource InLogicBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding SlotName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CheckedText, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <Border DockPanel.Dock="Top" Height="1" Background="#242424" Margin="0,0,6,6"/>
+                                <TextBlock DockPanel.Dock="Top" Text="{Binding StatusDetail}" FontSize="12" Foreground="{StaticResource SubBrush}"
+                                           TextWrapping="Wrap" Margin="2,4,6,6">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsTracking}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsError}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <ListBox Style="{StaticResource CheckList}" ItemsSource="{Binding Overview}" ItemTemplate="{StaticResource MiniRow}"
+                                         Background="Transparent" Padding="0" MouseDoubleClick="Column_DoubleClick">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource PlainRow}">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <Border x:Name="Bd" CornerRadius="6" Padding="6,4" Background="Transparent">
+                                                            <ContentPresenter/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- ===================== One game ===================== -->
+        <Grid x:Name="FocusView" Grid.Row="3" Margin="0,8,0,0" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource Card}" Padding="16">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Left" Cursor="Hand" MouseLeftButtonUp="Art_Click" ToolTip="Change box art">
+                        <Border x:Name="FArt" Width="78" Height="104" CornerRadius="6" Background="#1F1F1F"/>
+                        <Border Width="26" Height="26" CornerRadius="13" Background="#CC000000" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4">
+                            <Viewbox Width="13" Height="13">
+                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconPencil}" Stroke="{StaticResource TextBrush}"/>
+                            </Viewbox>
+                        </Border>
+                    </Grid>
+                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Top" Orientation="Horizontal">
+                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}"
+                                ToolTip="Rebuild this game's logic (re-reads its YAML)" Click="RefreshOne_Click"/>
+                    </StackPanel>
+                    <StackPanel Margin="18,2,8,0">
+                        <TextBlock x:Name="FTitle" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="FSub" FontSize="13" Foreground="{StaticResource SubBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                        <WrapPanel Margin="0,12,0,0">
+                            <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource InLogicBrush}">
+                                    <Run x:Name="FInLogic" FontWeight="Bold" FontSize="14"/><Run Text=" in logic"/>
+                                </TextBlock>
+                            </Border>
+                            <Border x:Name="FGlitchedChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource WarnBgBrush}">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource GlitchedBrush}">
+                                    <Run x:Name="FGlitched" FontWeight="Bold" FontSize="14"/><Run Text=" glitched"/>
+                                </TextBlock>
+                            </Border>
+                            <Border x:Name="FHintedChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource HintDimBrush}">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource HintBrush}">
+                                    <Run x:Name="FHinted" FontWeight="Bold" FontSize="14"/><Run Text=" hinted"/>
+                                </TextBlock>
+                            </Border>
+                            <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="#1F1F1F">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontSize="12.5" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center">
+                                        <Run x:Name="FChecked" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextBrush}"/><Run Text=" checked"/>
+                                    </TextBlock>
+                                    <Border Width="70" Height="4" CornerRadius="2" Background="#333333" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform x:Name="FBar" ScaleX="0"/>
+                                            </Border.RenderTransform>
+                                        </Border>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="FGoChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource AccentDimBrush}"
+                                    BorderBrush="{StaticResource AccentLineBrush}" BorderThickness="1">
+                                <TextBlock x:Name="FGo" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </WrapPanel>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Status / warning -->
+            <Border x:Name="FNotice" Grid.Row="1" Margin="0,10,0,0" Padding="14,10" CornerRadius="10" BorderThickness="1" Visibility="Collapsed">
+                <DockPanel>
+                    <Button x:Name="FNoticeBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="32" Padding="14,0"
+                            FontSize="12.5" Content="Retry" Click="RefreshOne_Click" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="FNoticeText" FontSize="12.5" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Toolbar -->
+            <DockPanel Grid.Row="2" Margin="0,14,0,10">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox x:Name="GroupToggle" Style="{StaticResource Toggle}" Content="Group by region" FontSize="12.5"
+                              Checked="View_Changed" Unchecked="View_Changed"/>
+                    <CheckBox x:Name="ItemsToggle" Style="{StaticResource Toggle}" Content="Items" FontSize="12.5" Margin="18,0,0,0"
+                              Checked="View_Changed" Unchecked="View_Changed"/>
+                    <CheckBox x:Name="ExplainToggle" Style="{StaticResource Toggle}" Content="Explain" FontSize="12.5" Margin="18,0,0,0"
+                              Checked="View_Changed" Unchecked="View_Changed"
+                              ToolTip="Why is a check (or region) in or out of logic? Same as UT's /explain and /get_logical_path"/>
+                </StackPanel>
+                <Grid Width="240" DockPanel.Dock="Left" Margin="0,0,12,0">
+                    <TextBox x:Name="Search" Style="{StaticResource Field}" MinHeight="36" Padding="34,0,10,0" FontSize="13"
+                             Tag="Search checks…" TextChanged="Search_TextChanged"/>
+                    <Viewbox Width="15" Height="15" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconSearch}" Stroke="{StaticResource SubBrush}"/>
+                    </Viewbox>
+                </Grid>
+                <WrapPanel VerticalAlignment="Center">
+                    <RadioButton x:Name="FInLogicPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="InLogic"
+                                 ToolTip="Checks you can do right now">In logic</RadioButton>
+                    <RadioButton x:Name="FReachPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Reachable"
+                                 ToolTip="In logic plus checks reachable with glitches/tricks">+ Glitched</RadioButton>
+                    <RadioButton x:Name="FAllPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="All"
+                                 ToolTip="Every check you haven't done">All remaining</RadioButton>
+                    <RadioButton x:Name="FHintPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Hinted"
+                                 ToolTip="Checks someone has hinted">Hinted</RadioButton>
+                    <RadioButton x:Name="FHiddenPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Hidden"
+                                 ToolTip="Checks you've hidden">Hidden</RadioButton>
+                </WrapPanel>
+            </DockPanel>
+
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition x:Name="ItemsCol" Width="0"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ListBox x:Name="CheckListBox" Style="{StaticResource CheckList}" ItemTemplate="{StaticResource CheckRow}"
+                         MouseDoubleClick="CheckList_DoubleClick">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Explain" Click="CtxExplain_Click"/>
+                            <MenuItem Header="Show logical path" Click="CtxPath_Click"/>
+                            <Separator/>
+                            <MenuItem x:Name="CtxHide" Header="Hide / show this check" Click="CtxHide_Click"/>
+                            <MenuItem Header="Copy name" Click="CtxCopy_Click"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="10,12,0,4">
+                                        <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                        <TextBlock Text="{Binding ItemCount}" FontSize="11.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                </ListBox>
+                <StackPanel x:Name="ListEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+                    <Viewbox Width="36" Height="36" Opacity="0.35" HorizontalAlignment="Center">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconCheck}" Stroke="{StaticResource TextBrush}" StrokeThickness="1.8"/>
+                    </Viewbox>
+                    <TextBlock x:Name="ListEmptyTitle" Style="{StaticResource ItemTitle}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    <TextBlock x:Name="ListEmptySub" Style="{StaticResource Sub}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- Explain / logical path (UT's /explain and /get_logical_path) -->
+                <Border x:Name="ExplainPanel" Grid.Row="1" Margin="0,10,0,0" Background="{StaticResource CardBrush}" CornerRadius="12"
+                        Padding="14,12" Visibility="Collapsed">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Tag="{StaticResource IconClose}" Width="36" Height="36"
+                                    Margin="6,0,0,0" ToolTip="Close" Click="ExplainClose_Click"/>
+                            <Button x:Name="PathBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="36" Padding="14,0" FontSize="13"
+                                    Content="Logical path" Margin="8,0,0,0" Click="Path_Click"
+                                    ToolTip="How to reach it with what you have (UT's /get_logical_path). Shift+Enter in the box."/>
+                            <Button x:Name="ExplainBtn" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
+                                    Content="Explain" Margin="10,0,0,0" Click="Explain_Click"
+                                    ToolTip="What a check or region needs (UT's /explain). Enter in the box."/>
+                            <TextBox x:Name="ExplainQuery" Style="{StaticResource Field}" MinHeight="36" FontSize="13"
+                                     Tag="Location, region or entrance (close spellings are fine)" KeyDown="ExplainQuery_KeyDown"/>
+                        </DockPanel>
+                        <ScrollViewer MaxHeight="230" Margin="2,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="ExplainOutput">
+                                <TextBlock Style="{StaticResource Sub}" FontSize="13"
+                                           Text="Double-click a check, right-click it, or type a name above."/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
+                <Border x:Name="ItemsPanel" Grid.Column="1" Grid.RowSpan="2" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
+                    <DockPanel>
+                        <TextBlock x:Name="ItemsHeader" DockPanel.Dock="Top" Style="{StaticResource Caps}" Margin="2,0,0,8"/>
+                        <ListBox x:Name="ItemsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ItemCount}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Count, StringFormat=×{0}}" FontSize="12"
+                                                   Foreground="{StaticResource SubBrush}" Margin="8,0,4,0"/>
+                                        <TextBlock x:Name="N" Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{StaticResource Text2Brush}"/>
+                                    </DockPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Progression}" Value="True">
+                                            <Setter TargetName="N" Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                            <Setter TargetName="N" Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- No multiworld yet -->
+        <StackPanel x:Name="EmptyState" Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <Viewbox Width="44" Height="44" Opacity="0.35" HorizontalAlignment="Center">
+                <Path Style="{StaticResource Icon}" Data="{StaticResource IconGlobe}" Stroke="{StaticResource TextBrush}" StrokeThickness="1.6"/>
+            </Viewbox>
+            <TextBlock x:Name="EmptyTitle" Text="Nothing to track yet" Style="{StaticResource ItemTitle}" FontSize="17" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+            <TextBlock x:Name="EmptySub" Style="{StaticResource Sub}" FontSize="13.5" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,6,0,0"
+                       Text="Add your multiworld's server and slot names, then activate it to track every game here."/>
+            <Button Style="{StaticResource AccentButton}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="Multiworlds_Click"
+                    Content="Set up a multiworld"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

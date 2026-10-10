@@ -1,0 +1,160 @@
+<Window x:Class="APMultiTracker.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:APMultiTracker"
+        Title="APMultiTracker" Icon="pack://application:,,,/Assets/app.ico" Width="1280" Height="900" MinWidth="900" MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="{StaticResource UiFont}" FontSize="14"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Background="{StaticResource SideBrush}">
+            <DockPanel x:Name="SideDock" Margin="0,24,0,16">
+                <StackPanel x:Name="SideHeader" DockPanel.Dock="Top" Orientation="Horizontal" Margin="24,0,20,24">
+                    <Border Width="32" Height="32" CornerRadius="8" Background="{StaticResource AccentBrush}">
+                        <Viewbox Width="18" Height="18">
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconTarget}" Stroke="Black" StrokeThickness="2.6"/>
+                        </Viewbox>
+                    </Border>
+                    <TextBlock Text="APMultiTracker" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
+
+                <!-- Engine chip -->
+                <Border x:Name="EngineChip" DockPanel.Dock="Bottom" Margin="16,0" Padding="12,10" CornerRadius="10" Background="#141414"
+                        Cursor="Hand" MouseLeftButtonUp="EngineChip_Click" ToolTip="Engine settings">
+                    <DockPanel>
+                        <Grid Width="10" Height="10" VerticalAlignment="Center" DockPanel.Dock="Left">
+                            <Ellipse x:Name="EngineGlow" Width="18" Height="18" Margin="-4" Opacity="0.25"/>
+                            <Ellipse x:Name="EngineDot"/>
+                        </Grid>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="EngineTitle" Text="Engine" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="EngineSub" FontSize="11" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Focused game: persists on every page -->
+                <Border x:Name="FocusCard" DockPanel.Dock="Bottom" Margin="16,0,16,8" Padding="12" CornerRadius="12"
+                        Background="#141414" BorderBrush="#262626" BorderThickness="2" Cursor="Hand" MouseLeftButtonUp="FocusCard_Click">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Border x:Name="GoTag" DockPanel.Dock="Right" CornerRadius="6" Padding="6,1,6,2" Visibility="Collapsed"
+                                    Background="{StaticResource InLogicDimBrush}" VerticalAlignment="Center">
+                                <TextBlock x:Name="GoText" Text="GO MODE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
+                            </Border>
+                            <TextBlock x:Name="FocusLabel" Text="FOCUSED" Style="{StaticResource Caps}" FontSize="10.5" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <Grid x:Name="FocusArtBox" HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <Border x:Name="FocusArt" Width="84" Height="112" CornerRadius="6" Background="#1F1F1F"/>
+                            <Viewbox x:Name="FocusArtIdle" Width="34" Height="34" Opacity="0.25" IsHitTestVisible="False">
+                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconGrid}" Stroke="{StaticResource TextBrush}"/>
+                            </Viewbox>
+                        </Grid>
+                        <TextBlock x:Name="FocusGame" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"
+                                   MaxHeight="40" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="FocusSlot" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                            <TextBlock x:Name="FocusCount" FontSize="26" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
+                            <TextBlock x:Name="FocusCountLabel" Text=" in logic" FontSize="12.5" Foreground="{StaticResource Text2Brush}"
+                                       VerticalAlignment="Bottom" Margin="4,0,0,6"/>
+                        </StackPanel>
+                        <Border Height="4" CornerRadius="2" Margin="0,8,0,0" Background="#262626">
+                            <Border x:Name="FocusBar" CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="FocusBarScale" ScaleX="0"/>
+                                </Border.RenderTransform>
+                            </Border>
+                        </Border>
+                        <TextBlock x:Name="FocusChecked" FontSize="11" Foreground="{StaticResource SubBrush}" TextAlignment="Center" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="NavMenu" VerticalAlignment="Top">
+                    <RadioButton x:Name="NavTracker" Style="{StaticResource NavButton}" Content="Tracker" Tag="{StaticResource IconTarget}" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavMultiworlds" Style="{StaticResource NavButton}" Content="Multiworlds" Tag="{StaticResource IconGlobe}" Checked="Nav_Checked"/>
+                    <Grid>
+                        <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}" Content="Settings" Tag="{StaticResource IconGear}" Checked="Nav_Checked"/>
+                        <Border x:Name="SetupBadge" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                                CornerRadius="8" Padding="7,1,7,2" Background="{StaticResource WarnBgBrush}"
+                                BorderBrush="{StaticResource WarnLineBrush}" BorderThickness="1"
+                                IsHitTestVisible="False" Visibility="Collapsed">
+                            <TextBlock Text="Setup" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource WarnBrush}"/>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <ContentControl x:Name="Host" Grid.Column="1" Focusable="False"/>
+
+        <!-- Box art picker -->
+        <Grid x:Name="ArtLayer" Grid.ColumnSpan="2" Visibility="Collapsed">
+            <Border Background="#B8000000" MouseLeftButtonDown="ArtBackdrop_MouseDown"/>
+            <Border Width="480" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="16" Background="#1A1A1A"
+                    BorderBrush="{StaticResource LineBrush}" BorderThickness="2" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.7" Color="Black"/>
+                </Border.Effect>
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Tag="{StaticResource IconClose}"
+                                Width="32" Height="32" ToolTip="Close" Click="ArtClose_Click"/>
+                        <TextBlock x:Name="ArtTitle" FontSize="17" FontWeight="Bold" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <TextBlock x:Name="ArtSub" Style="{StaticResource Sub}" Margin="0,6,0,14"/>
+                    <local:CategoryPicker x:Name="ArtPicker"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                        <Button Content="Use automatic art" Style="{StaticResource OutlineButton}" Height="40" Click="ArtReset_Click"/>
+                        <Button Content="Done" Style="{StaticResource AccentButton}" Height="40" MinWidth="96" Margin="10,0,0,0" Click="ArtClose_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- In-app confirmation dialog -->
+        <Grid x:Name="ConfirmLayer" Grid.ColumnSpan="2" Visibility="Collapsed" Opacity="0" KeyboardNavigation.TabNavigation="Cycle">
+            <Border Background="#B8000000" MouseLeftButtonDown="ConfirmBackdrop_MouseDown"/>
+            <Border x:Name="ConfirmCard" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    CornerRadius="16" Background="#1A1A1A" BorderBrush="{StaticResource LineBrush}" BorderThickness="2" Padding="24"
+                    RenderTransformOrigin="0.5,0.5" Focusable="True" FocusVisualStyle="{x:Null}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.7" Color="Black"/>
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="ConfirmScale" ScaleX="1" ScaleY="1"/>
+                </Border.RenderTransform>
+                <StackPanel>
+                    <DockPanel>
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{StaticResource DangerBgBrush}"
+                                BorderBrush="{StaticResource DangerLineBrush}" BorderThickness="1" DockPanel.Dock="Left" VerticalAlignment="Top">
+                            <Viewbox Width="18" Height="18">
+                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconTrash}" Stroke="{StaticResource DangerBrush}" StrokeThickness="2.2"/>
+                            </Viewbox>
+                        </Border>
+                        <StackPanel Margin="14,0,0,0">
+                            <TextBlock x:Name="ConfirmTitle" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="ConfirmMessage" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                        <Button x:Name="ConfirmNo" Content="Cancel" Style="{StaticResource OutlineButton}" Height="40" MinWidth="104"
+                                IsCancel="True" Click="ConfirmNo_Click"/>
+                        <Button x:Name="ConfirmYes" Content="Remove" Style="{StaticResource DangerButton}" Height="40" MinWidth="104"
+                                Margin="10,0,0,0" IsDefault="True" Click="ConfirmYes_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

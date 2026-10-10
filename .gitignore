@@ -1,0 +1,9 @@
+bin/
+obj/
+dist/
+dist-standalone/
+.vs/
+*.user
+__pycache__/
+*.pyc
+screenshots-out/

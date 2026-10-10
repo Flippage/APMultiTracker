@@ -1,0 +1,103 @@
+name: Build APMultiTracker
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to publish (e.g. 0.1.0). Leave blank to just build.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # needed to create a Release when a v* tag is pushed
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "0.1.0"
+          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart('v') }
+          elseif ("${{ inputs.version }}" -ne "") { $v = "${{ inputs.version }}".TrimStart('v') }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          $release = ("${{ github.ref_type }}" -eq "tag") -or ("${{ inputs.version }}" -ne "")
+          "release=$($release.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+
+      - name: Check the engine compiles
+        shell: pwsh
+        run: python -m py_compile engine/apmultitracker/__init__.py engine/apmultitracker/engine.py
+
+      - name: Publish (small, needs .NET 10 Desktop Runtime)
+        run: dotnet publish src/APMultiTracker.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=none -p:Version=${{ steps.ver.outputs.version }} -o dist
+
+      - name: Publish (standalone)
+        run: dotnet publish src/APMultiTracker.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -p:Version=${{ steps.ver.outputs.version }} -o dist-standalone
+
+      # Launch both builds for real: the window must open, every page must render and the engine must be embedded.
+      - name: Smoke test (starts and shows UI)
+        shell: pwsh
+        run: |
+          foreach ($exe in @("dist/APMultiTracker.exe", "dist-standalone/APMultiTracker.exe")) {
+            $p = Start-Process -FilePath $exe -ArgumentList "--selftest" -PassThru
+            if (-not $p.WaitForExit(90000)) { $p.Kill(); throw "$exe --selftest timed out" }
+            if ($p.ExitCode -ne 0) {
+              $log = Join-Path $env:APPDATA "APMultiTracker/error.log"
+              if (Test-Path $log) { Get-Content $log -Raw | Write-Host }
+              throw "$exe --selftest failed with exit code $($p.ExitCode)"
+            }
+            Write-Host "$exe OK"
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: APMultiTracker
+          path: |
+            dist-standalone/APMultiTracker.exe
+            src/obj/engine-pack/apmultitracker.apworld
+
+      - name: Package release files
+        if: steps.ver.outputs.release == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $v = "${{ steps.ver.outputs.tag }}"
+          Copy-Item dist-standalone/APMultiTracker.exe "release/APMultiTracker-$v.exe"
+          Copy-Item dist/APMultiTracker.exe "release/APMultiTracker-$v-small-needs-dotnet10.exe"
+          Compress-Archive -Path dist-standalone/APMultiTracker.exe -DestinationPath "release/APMultiTracker-$v.zip"
+          Copy-Item src/obj/engine-pack/apmultitracker.apworld release/apmultitracker.apworld
+
+      - name: Release notes from CHANGELOG.md
+        if: steps.ver.outputs.release == 'true'
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $text = if (Test-Path CHANGELOG.md) { Get-Content CHANGELOG.md -Raw } else { "" }
+          $m = [regex]::Match($text, "(?ms)^##\s*\[?v?$([regex]::Escape($v))\]?[^\r\n]*\r?\n(.*?)(?=^##\s|\z)")
+          $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "See the commit history." }
+          $notes += "`n`n---`n**Download:** ``APMultiTracker-v$v.zip`` (recommended). The app installs its engine into Archipelago for you; ``apmultitracker.apworld`` is attached for manual installs. Requires [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker)."
+          Set-Content -Path release-notes.md -Value $notes -Encoding utf8
+
+      - name: Create GitHub Release
+        if: steps.ver.outputs.release == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          name: APMultiTracker ${{ steps.ver.outputs.tag }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: release/*
+          body_path: release-notes.md

@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>APMultiTracker</RootNamespace>
+    <AssemblyName>APMultiTracker</AssemblyName>
+    <Version>0.1.0</Version>
+    <Product>APMultiTracker</Product>
+    <Description>Tracks every game in your Archipelago multiworld in one window.</Description>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <NoWarn>$(NoWarn);SYSLIB1054;CA1416</NoWarn>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <!--
+    The engine (engine/apmultitracker) is zipped into apmultitracker.apworld and embedded, so the app can
+    install or update it in the user's Archipelago folder with one click.
+  -->
+  <PropertyGroup>
+    <EngineSrc>$(MSBuildThisFileDirectory)..\engine\apmultitracker\</EngineSrc>
+    <EngineStage>$(MSBuildProjectDirectory)\obj\engine-pack\stage\</EngineStage>
+    <EngineApworld>$(MSBuildProjectDirectory)\obj\engine-pack\apmultitracker.apworld</EngineApworld>
+  </PropertyGroup>
+
+  <Target Name="PackEngine" BeforeTargets="BeforeBuild">
+    <ItemGroup>
+      <EngineFiles Include="$(EngineSrc)**\*" Exclude="$(EngineSrc)**\__pycache__\**;$(EngineSrc)**\*.pyc" />
+    </ItemGroup>
+    <RemoveDir Directories="$(EngineStage)" />
+    <Copy SourceFiles="@(EngineFiles)" DestinationFiles="@(EngineFiles->'$(EngineStage)apmultitracker\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <ZipDirectory SourceDirectory="$(EngineStage)" DestinationFile="$(EngineApworld)" Overwrite="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(EngineApworld)" LogicalName="apmultitracker.apworld" />
+    </ItemGroup>
+  </Target>
+
+</Project>
