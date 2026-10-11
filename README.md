@@ -38,7 +38,7 @@ in one place, with a faster, cleaner interface.
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |
-| 💬 **Feed** | The room's messages as they happen, like the Text Client: items sent, hints, chat and goals, colour-coded and filterable. Chat or `!hint` from any of your slots. |
+| 💬 **Feed** | The room's messages as they happen, like the Text Client: items sent, hints, chat and goals, colour-coded and filterable. Chat or `!hint` from any of your slots. Show it on its own page or docked beside the Tracker. |
 | 🌍 **Several multiworlds at once** | Save rooms with their server and slots (**Find slots in this room** lists everyone). Keep several connected and switch between them instantly. |
 | ⚙️ **Zero fuss engine** | One click installs the engine into Archipelago; the app starts and stops it for you. |
 | ⬆️ **Auto-updates** | Checks GitHub for new versions, downloads in the background and installs in one click. |
@@ -71,6 +71,17 @@ slot hears it, and the tracker's own connections are hidden.
 
 <p align="center">
   <img src="docs/screenshots/feed.png" alt="The room's message feed" width="900">
+</p>
+
+### Feed and Tracker together
+
+Click **Feed** in the Tracker's header to dock the feed next to your checks: on the **right** (default) or along the
+**bottom**. Switch sides with the two buttons in the feed's title bar and drag the divider to resize it; each side
+remembers its size. When a game is focused, the feed chats as that game's slot.
+
+<p align="center">
+  <img src="docs/screenshots/tracker-feed-right.png" alt="Feed docked on the right of the Tracker" width="440">
+  <img src="docs/screenshots/tracker-feed-bottom.png" alt="Feed docked along the bottom of the Tracker" width="440">
 </p>
 
 ## Several multiworlds at once

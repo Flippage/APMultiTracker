@@ -177,6 +177,23 @@ public static class Demo
         await Shot("explain");
         w.NavFeed.IsChecked = true;
         await Shot("feed");
+
+        // The feed docked in the Tracker: right, then bottom.
+        w.GoToTracker();
+        foreach (var dock in new[] { "Right", "Bottom" })
+        {
+            App.Config.ShowFeedInTracker = true;
+            App.Config.FeedDock = dock;
+            w.TrackerView.ApplyFeedDock();
+            App.Tracker.SetFocus(null);
+            await Shot($"tracker-feed-{dock.ToLowerInvariant()}");
+            App.Tracker.SetFocus(App.Tracker.Slots[0]);
+            await Shot($"tracker-feed-{dock.ToLowerInvariant()}-focused");
+        }
+        App.Config.ShowFeedInTracker = false;
+        App.Config.FeedDock = "Right";
+        w.TrackerView.ApplyFeedDock();
+        App.Tracker.SetFocus(App.Tracker.Slots[0]);
         w.NavMultiworlds.IsChecked = true;
         await Shot("multiworlds");
         w.OpenMultiworldEditor(App.Config.Multiworlds[0]);

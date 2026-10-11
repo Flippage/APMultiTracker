@@ -21,6 +21,11 @@ public sealed class AppConfig
     // ---- feed view
     public bool FeedOnlyMine { get; set; }
     public string FeedFilter { get; set; } = "All";
+    /// <summary>Show the feed docked in the Tracker, on the "Right" or at the "Bottom".</summary>
+    public bool ShowFeedInTracker { get; set; }
+    public string FeedDock { get; set; } = "Right";
+    public double FeedDockWidth { get; set; } = 400;
+    public double FeedDockHeight { get; set; } = 250;
 
     /// <summary>Archipelago game name → box art URL picked by the user.</summary>
     public Dictionary<string, string> ArtOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);

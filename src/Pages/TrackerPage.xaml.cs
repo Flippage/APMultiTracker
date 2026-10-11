@@ -42,6 +42,15 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         OverviewScroll.SizeChanged += (_, _) => UpdateColumnsWidth();   // also fires when All games is first shown
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) RefreshAll(); };
 
+        DockedFeed.DockRequested += pos =>
+        {
+            if (pos == null) App.Config.ShowFeedInTracker = false;
+            else App.Config.FeedDock = pos;
+            App.SaveConfig();
+            ApplyFeedDock();
+        };
+        ApplyFeedDock();
+
         _syncing = true;
         GroupToggle.IsChecked = App.Config.GroupByRegion;
         OverviewGroupToggle.IsChecked = App.Config.OverviewGroupByRegion;
@@ -294,6 +303,72 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Config.OverviewGroupByRegion = OverviewGroupToggle.IsChecked == true;
         App.SaveConfig();
         foreach (var s in App.Tracker.Slots) s.ApplyOverviewGrouping();
+    }
+
+    // ------------------------------------------------------------------ feed docked beside / under the tracker
+
+    private void FeedBtn_Click(object sender, RoutedEventArgs e)
+    {
+        App.Config.ShowFeedInTracker = !App.Config.ShowFeedInTracker;
+        App.SaveConfig();
+        ApplyFeedDock();
+    }
+
+    /// <summary>Show/hide the docked feed on the right or along the bottom, at the size the user last dragged it to.</summary>
+    public void ApplyFeedDock()
+    {
+        bool on = App.Config.ShowFeedInTracker;
+        bool right = App.Config.FeedDock != "Bottom";
+        FeedDock.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        FeedVSplit.Visibility = on && right ? Visibility.Visible : Visibility.Collapsed;
+        FeedHSplit.Visibility = on && !right ? Visibility.Visible : Visibility.Collapsed;
+
+        FeedSplitCol.Width = new GridLength(on && right ? 16 : 0);
+        FeedCol.Width = new GridLength(on && right ? App.Config.FeedDockWidth : 0);
+        FeedCol.MinWidth = on && right ? 300 : 0;
+        FeedSplitRow.Height = new GridLength(on && !right ? 12 : 0);
+        FeedRow.Height = new GridLength(on && !right ? App.Config.FeedDockHeight : 0);
+        FeedRow.MinHeight = on && !right ? 150 : 0;
+
+        if (right)
+        {
+            Grid.SetRow(FeedDock, 0); Grid.SetColumn(FeedDock, 2);
+            Grid.SetRowSpan(FeedDock, 3); Grid.SetColumnSpan(FeedDock, 1);
+            FeedDock.Margin = new Thickness(0, 26, 24, 20);
+            MainContent.Margin = new Thickness(32, 26, on ? 0 : 32, 20);
+        }
+        else
+        {
+            Grid.SetRow(FeedDock, 2); Grid.SetColumn(FeedDock, 0);
+            Grid.SetRowSpan(FeedDock, 1); Grid.SetColumnSpan(FeedDock, 3);
+            FeedDock.Margin = new Thickness(32, 0, 32, 20);
+            MainContent.Margin = new Thickness(32, 26, 32, on ? 0 : 20);
+        }
+        DockedFeed.SetDockPosition(right ? "Right" : "Bottom");
+
+        var accent = (Brush)FindResource("AccentBrush");
+        var normal = (Brush)FindResource("Text2Brush");
+        FeedBtn.Background = on ? (Brush)FindResource("AccentDimBrush") : Brushes.Transparent;
+        FeedBtn.BorderBrush = on ? (Brush)FindResource("AccentLineBrush") : (Brush)FindResource("LineBrush");
+        FeedBtnIcon.Stroke = on ? accent : normal;
+        FeedBtnText.Foreground = on ? accent : normal;
+        FeedBtn.ToolTip = on ? "Hide the feed" : "Show the feed next to the tracker";
+    }
+
+    /// <summary>Self-test: the docked feed is on screen with a usable size.</summary>
+    public void AssertFeedDocked()
+    {
+        if (FeedDock.ActualWidth < 250 || FeedDock.ActualHeight < 120)
+            throw new InvalidOperationException($"Docked feed ({App.Config.FeedDock}) is {FeedDock.ActualWidth:0}x{FeedDock.ActualHeight:0}.");
+        if (MainContent.ActualWidth < 300 || MainContent.ActualHeight < 250)
+            throw new InvalidOperationException($"Tracker squeezed to {MainContent.ActualWidth:0}x{MainContent.ActualHeight:0} by the docked feed.");
+    }
+
+    private void FeedSplit_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        if (App.Config.FeedDock == "Bottom") App.Config.FeedDockHeight = Math.Round(FeedRow.ActualHeight);
+        else App.Config.FeedDockWidth = Math.Round(FeedCol.ActualWidth);
+        App.SaveConfig();
     }
 
     // ------------------------------------------------------------------ layout on small windows

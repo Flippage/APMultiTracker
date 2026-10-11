@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.0
+
+- **Feed and Tracker together**: a new **Feed** button on the Tracker shows the feed right next to your checks,
+  docked on the **right** (default) or along the **bottom**. Switch sides with the buttons in the feed's title bar,
+  drag the divider to resize it (remembered for each side), and close it with ×. It's the full feed: filters,
+  "Only my slots", highlights and the chat box.
+- **Chat as the game you're looking at**: opening the Feed with a game focused makes that game's slot the sender;
+  the docked feed follows as you switch games.
+
 ## v0.4.1
 
 - Fix: switching to All games after the app started on a focused game showed no checks until the window was

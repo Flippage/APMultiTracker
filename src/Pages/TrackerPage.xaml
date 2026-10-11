@@ -159,7 +159,20 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Margin="32,26,32,20">
+    <!-- Tracker content, with the feed optionally docked on the right or along the bottom -->
+    <Grid x:Name="DockRoot">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="420"/>
+            <ColumnDefinition x:Name="FeedSplitCol" Width="0"/>
+            <ColumnDefinition x:Name="FeedCol" Width="0"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="300"/>
+            <RowDefinition x:Name="FeedSplitRow" Height="0"/>
+            <RowDefinition x:Name="FeedRow" Height="0"/>
+        </Grid.RowDefinitions>
+
+    <Grid x:Name="MainContent" Margin="32,26,32,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -170,6 +183,15 @@
         <!-- Header -->
         <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="FeedBtn" Style="{StaticResource OutlineButton}" Padding="14,0" Margin="0,0,8,0" Click="FeedBtn_Click"
+                        ToolTip="Show the feed next to the tracker">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="15" Height="15" Margin="0,0,8,0">
+                            <Path x:Name="FeedBtnIcon" Style="{StaticResource Icon}" Data="{StaticResource IconChat}" Stroke="{StaticResource Text2Brush}"/>
+                        </Viewbox>
+                        <TextBlock x:Name="FeedBtnText" Text="Feed" FontWeight="Normal" Foreground="{StaticResource Text2Brush}"/>
+                    </StackPanel>
+                </Button>
                 <Button x:Name="RefreshAllBtn" Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}" Margin="0,0,8,0"
                         ToolTip="Rebuild logic for every game (re-reads YAMLs)" Click="RefreshAll_Click"/>
                 <Button x:Name="SwitchBtn" Style="{StaticResource OutlineButton}" Padding="18,0" Click="Switch_Click"
@@ -531,5 +553,33 @@
             <Button Style="{StaticResource AccentButton}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="Multiworlds_Click"
                     Content="Set up a multiworld"/>
         </StackPanel>
+    </Grid>
+
+        <GridSplitter x:Name="FeedVSplit" Grid.Column="1" Grid.RowSpan="3" Width="16" HorizontalAlignment="Stretch" Background="Transparent"
+                      ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWE" Visibility="Collapsed"
+                      ToolTip="Drag to resize" DragCompleted="FeedSplit_DragCompleted">
+            <GridSplitter.Template>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="Transparent">
+                        <Border Width="4" Height="44" CornerRadius="2" Background="#333333" HorizontalAlignment="Center"/>
+                    </Grid>
+                </ControlTemplate>
+            </GridSplitter.Template>
+        </GridSplitter>
+        <GridSplitter x:Name="FeedHSplit" Grid.Row="1" Grid.ColumnSpan="3" Height="12" HorizontalAlignment="Stretch" Background="Transparent"
+                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Cursor="SizeNS" Visibility="Collapsed"
+                      ToolTip="Drag to resize" DragCompleted="FeedSplit_DragCompleted">
+            <GridSplitter.Template>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="Transparent">
+                        <Border Width="44" Height="4" CornerRadius="2" Background="#333333" VerticalAlignment="Center"/>
+                    </Grid>
+                </ControlTemplate>
+            </GridSplitter.Template>
+        </GridSplitter>
+
+        <Border x:Name="FeedDock" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,10,14,12" Visibility="Collapsed">
+            <local:FeedPanel x:Name="DockedFeed" Docked="True"/>
+        </Border>
     </Grid>
 </UserControl>

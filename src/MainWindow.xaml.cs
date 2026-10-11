@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         App.Tracker.FeedAdded += (world, m) =>
         {
             if (world != App.Tracker.ActiveLive || Host.Content == _feed || m.Kind is "Join" or "Part") return;
+            if (Host.Content == _tracker && App.Config.ShowFeedInTracker) return;   // already visible, docked
             _unread++;
             UpdateFeedBadge();
         };
@@ -381,9 +382,32 @@ public partial class MainWindow : Window
 
     public async Task SelfTestAsync()
     {
+        // Opening the Feed with a game focused: that game's slot is the one you chat as.
+        GoToTracker();
+        App.Tracker.SetFocus(App.Tracker.Slots[1]);
+        UpdateLayout();
         NavFeed.IsChecked = true;
         UpdateLayout();
+        if (_feed.AsSlotName != App.Tracker.Slots[1].SlotName)
+            throw new InvalidOperationException($"Feed chats as '{_feed.AsSlotName}', expected the focused '{App.Tracker.Slots[1].SlotName}'.");
         _feed.SelfTest();
+        App.Tracker.SetFocus(null);
+
+        // The feed docked in the Tracker, on the right and along the bottom.
+        GoToTracker();
+        foreach (var dock in new[] { "Right", "Bottom" })
+        {
+            App.Config.ShowFeedInTracker = true;
+            App.Config.FeedDock = dock;
+            _tracker.ApplyFeedDock();
+            UpdateLayout();
+            await Task.Delay(100);
+            _tracker.AssertFeedDocked();
+        }
+        App.Config.ShowFeedInTracker = false;
+        App.Config.FeedDock = "Right";
+        _tracker.ApplyFeedDock();
+        UpdateLayout();
         foreach (var nav in new[] { NavMultiworlds, NavSettings, NavTracker })
         {
             nav.IsChecked = true;
