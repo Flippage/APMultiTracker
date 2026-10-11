@@ -26,6 +26,10 @@ public partial class MainWindow : Window
         var work = SystemParameters.WorkArea;
         Width = Math.Min(1500, work.Width - 40);
         Height = Math.Min(940, work.Height - 40);
+        RestoreWindowPlacement();
+        LocationChanged += (_, _) => RememberWindowPlacement();
+        SizeChanged += (_, _) => RememberWindowPlacement();
+        StateChanged += (_, _) => RememberWindowPlacement();
         SourceInitialized += (_, _) => Native.StyleTitleBar(new WindowInteropHelper(this).Handle);
         Closing += OnClosing;
         Topmost = App.Config.AlwaysOnTop;
@@ -52,7 +56,14 @@ public partial class MainWindow : Window
         UpdateEngineChip();
         UpdateFocusCard();
         UpdateUpdateBadge();
-        NavTracker.IsChecked = true;
+        // Open on the page you were last using.
+        (App.Config.LastPage switch
+        {
+            "Feed" => NavFeed,
+            "Multiworlds" => NavMultiworlds,
+            "Settings" => NavSettings,
+            _ => NavTracker,
+        }).IsChecked = true;
     }
 
     // ------------------------------------------------------------------ navigation
@@ -63,6 +74,12 @@ public partial class MainWindow : Window
         Host.Content = sender == NavMultiworlds ? _multiworlds : sender == NavSettings ? _settings
                      : sender == NavFeed ? _feed : _tracker;
         if (Host.Content == _feed) { _unread = 0; UpdateFeedBadge(); }
+        if (!App.DemoMode)
+        {
+            App.Config.LastPage = Host.Content == _feed ? "Feed" : Host.Content == _multiworlds ? "Multiworlds"
+                                : Host.Content == _settings ? "Settings" : "Tracker";
+            App.SaveConfig();
+        }
     }
 
     public TrackerPage TrackerView => _tracker;
@@ -443,8 +460,47 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ window
 
+    // ------------------------------------------------------------------ window placement
+
+    /// <summary>Put the window back where it was, if that spot is still on a connected screen.</summary>
+    private void RestoreWindowPlacement()
+    {
+        var c = App.Config;
+        if (App.DemoMode || c.WindowWidth < MinWidth || c.WindowHeight < MinHeight) return;
+        var screen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                              SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        var saved = new Rect(c.WindowLeft, c.WindowTop, c.WindowWidth, c.WindowHeight);
+        var visible = Rect.Intersect(screen, saved);
+        if (visible.IsEmpty || visible.Width < 200 || visible.Height < 120) return;   // that monitor is gone
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = c.WindowLeft; Top = c.WindowTop; Width = c.WindowWidth; Height = c.WindowHeight;
+        if (c.WindowMaximized) SourceInitialized += (_, _) => WindowState = WindowState.Maximized;
+    }
+
+    private readonly DispatcherTimer _placementSave = new() { Interval = TimeSpan.FromSeconds(1) };
+    private bool _placementHooked;
+
+    /// <summary>Keeps the window's normal position/size and maximised state in the config (saved a second later).</summary>
+    private void RememberWindowPlacement()
+    {
+        if (App.DemoMode || !IsLoaded || WindowState == WindowState.Minimized) return;
+        var b = WindowState == WindowState.Normal ? new Rect(Left, Top, ActualWidth, ActualHeight) : RestoreBounds;
+        if (b.IsEmpty || b.Width < 100) return;
+        var c = App.Config;
+        c.WindowLeft = b.Left; c.WindowTop = b.Top; c.WindowWidth = b.Width; c.WindowHeight = b.Height;
+        c.WindowMaximized = WindowState == WindowState.Maximized;
+        if (!_placementHooked)
+        {
+            _placementHooked = true;
+            _placementSave.Tick += (_, _) => { _placementSave.Stop(); App.SaveConfig(); };
+        }
+        _placementSave.Stop();
+        _placementSave.Start();
+    }
+
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        RememberWindowPlacement();
         if (App.IsExiting) return;
         e.Cancel = true;
         Dispatcher.InvokeAsync(App.Current.ExitApp);

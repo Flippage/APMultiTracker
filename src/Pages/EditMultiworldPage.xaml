@@ -38,7 +38,13 @@
                             </StackPanel>
                         </Grid>
                         <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,0"
-                                   Text="Paste the address from the room page, e.g. archipelago.gg:38281. A /connect line or archipelago:// link works too."/>
+                                   Text="Paste the address from the room page, e.g. archipelago.gg:38281. A /connect line, archipelago:// link or the room's page link works too."/>
+
+                        <TextBlock Text="Room link (recommended for archipelago.gg)" Style="{StaticResource ItemTitle}" FontSize="13.5" Margin="0,16,0,0"/>
+                        <TextBox x:Name="RoomBox" Style="{StaticResource Field}" Margin="0,6,0,0" Tag="https://archipelago.gg/room/…"
+                                 FontFamily="{StaticResource MonoFont}" FontSize="12.5" LostFocus="RoomBox_LostFocus"/>
+                        <TextBlock x:Name="RoomHint" Style="{StaticResource Sub}" Margin="0,8,0,0"
+                                   Text="With the room's page link, the app wakes the room when it's asleep and follows it if it restarts on a different port. It also lets Find slots list everyone without connecting."/>
                     </StackPanel>
                 </Border>
 

@@ -44,6 +44,16 @@ public sealed class AppConfig
     public bool InstallUpdatesOnLaunch { get; set; }
     public PendingUpdate? PendingUpdate { get; set; }
 
+    // ---- remembered between runs
+    public double WindowLeft { get; set; }
+    public double WindowTop { get; set; }
+    public double WindowWidth { get; set; }
+    public double WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
+    public string LastPage { get; set; } = "Tracker";
+    public bool ShowItems { get; set; }
+    public bool ShowExplain { get; set; }
+
     // ---- app
     public bool StartWithWindows { get; set; }
     public bool AlwaysOnTop { get; set; }
@@ -59,6 +69,8 @@ public sealed class Multiworld
     /// <summary>host:port, e.g. archipelago.gg:38281</summary>
     public string Server { get; set; } = "";
     public string Password { get; set; } = "";
+    /// <summary>The room's page (https://archipelago.gg/room/…), if known: lets the app follow the room to a new port.</summary>
+    public string RoomLink { get; set; } = "";
     /// <summary>Folder with the players' YAMLs (only needed by games that can't rebuild without one).</summary>
     public string YamlFolder { get; set; } = "";
     public List<SlotRef> Slots { get; set; } = new();

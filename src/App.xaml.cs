@@ -15,6 +15,7 @@ public partial class App : Application
     public static EngineHost Engine { get; private set; } = null!;
     public static TrackerStore Tracker { get; private set; } = null!;
     public static Updater Updater { get; private set; } = null!;
+    public static RoomWatcher Rooms { get; private set; } = null!;
     public static bool IsExiting { get; private set; }
     public static bool DemoMode { get; private set; }
 
@@ -106,6 +107,7 @@ public partial class App : Application
         Engine = new EngineHost(Dispatcher);
         Tracker = new TrackerStore(Engine);
         Updater = new Updater(Config);
+        Rooms = new RoomWatcher(Tracker);
         Engine.Changed += () =>
         {
             if (Engine.State != EngineState.Running) Tracker.MarkAllOffline();
@@ -133,6 +135,7 @@ public partial class App : Application
     {
         try { await Twitch.InitAsync(); } catch { }
         Updater.Start();
+        _ = Rooms.CheckAllAsync();   // rooms that moved while the app was closed
         Engine.Detect();
         await Engine.StartAsync();
     }

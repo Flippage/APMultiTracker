@@ -529,6 +529,15 @@ public sealed class TrackerStore
 
     public void RaiseChanged(SlotView? slot) => Changed?.Invoke(slot);
 
+    /// <summary>A message from the app itself in a multiworld's feed (e.g. "the room moved").</summary>
+    public void Notice(Multiworld mw, string text) => AddFeed(mw.Id, new JsonObject
+    {
+        ["kind"] = "Text",
+        ["time"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
+        ["segments"] = new JsonArray(new JsonObject { ["text"] = text, ["color"] = "blue" }),
+        ["players"] = new JsonArray(),
+    });
+
     /// <summary>When the engine goes away, every slot is offline until it's back.</summary>
     public void MarkAllOffline()
     {

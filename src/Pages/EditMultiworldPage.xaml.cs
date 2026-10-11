@@ -33,6 +33,7 @@ public partial class EditMultiworldPage : UserControl
         ServerBox.Text = world?.Server ?? "";
         PasswordBox.Password = world?.Password ?? "";
         YamlBox.Text = world?.YamlFolder ?? "";
+        RoomBox.Text = world?.RoomLink ?? "";
         foreach (var s in world?.Slots ?? new())
             _slots.Add(new SlotRef { Id = s.Id, Name = s.Name, Game = s.Game });
         if (_slots.Count == 0) _slots.Add(new SlotRef());
@@ -60,6 +61,14 @@ public partial class EditMultiworldPage : UserControl
 
     private void ServerBox_LostFocus(object sender, RoutedEventArgs e)
     {
+        // A room page link pasted into the server box: keep it as the room link and look up the address.
+        if (RoomLink.Normalize(ServerBox.Text) is string link)
+        {
+            RoomBox.Text = link;
+            ServerBox.Text = "";
+            _ = FillServerFromRoomAsync(link);
+            return;
+        }
         var (server, slot, pass) = ParseAddress(ServerBox.Text);
         ServerBox.Text = server;
         if (pass != null && PasswordBox.Password.Length == 0) PasswordBox.Password = pass;
@@ -68,6 +77,38 @@ public partial class EditMultiworldPage : UserControl
             var empty = _slots.FirstOrDefault(s => string.IsNullOrWhiteSpace(s.Name));
             if (empty != null) _slots.Remove(empty);
             _slots.Add(new SlotRef { Name = slot });
+        }
+    }
+
+    private void RoomBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (RoomBox.Text.Trim().Length == 0) { RoomHint.Foreground = (System.Windows.Media.Brush)FindResource("SubBrush"); return; }
+        if (RoomLink.Normalize(RoomBox.Text) is not string link)
+        {
+            RoomHint.Text = "That doesn't look like a room link. It should look like https://archipelago.gg/room/AbC123\u2026";
+            RoomHint.Foreground = (System.Windows.Media.Brush)FindResource("DangerBrush");
+            return;
+        }
+        RoomBox.Text = link;
+        _ = FillServerFromRoomAsync(link);
+    }
+
+    /// <summary>Asks the web host for the room's current port (waking it if needed) and fills in the server.</summary>
+    private async System.Threading.Tasks.Task FillServerFromRoomAsync(string link)
+    {
+        RoomHint.Foreground = (System.Windows.Media.Brush)FindResource("SubBrush");
+        RoomHint.Text = "Looking up the room\u2026";
+        int port = await RoomLink.FindPortAsync(link, wake: true);
+        if (RoomLink.ServerFor(link, port) is string server)
+        {
+            ServerBox.Text = server;
+            RoomHint.Text = $"Room found: {server}. The app will follow it if it moves to another port.";
+            RoomHint.Foreground = (System.Windows.Media.Brush)FindResource("GoodBrush");
+        }
+        else
+        {
+            RoomHint.Text = "Couldn't reach that room. Check the link, or open the room page in your browser.";
+            RoomHint.Foreground = (System.Windows.Media.Brush)FindResource("DangerBrush");
         }
     }
 
@@ -81,6 +122,19 @@ public partial class EditMultiworldPage : UserControl
     private async void Find_Click(object sender, RoutedEventArgs e)
     {
         ServerBox_LostFocus(sender, e);
+        if (RoomLink.Normalize(RoomBox.Text) is string link)
+        {
+            FindBtn.IsEnabled = false;
+            ShowFind("Reading the room\u2026");
+            try
+            {
+                var status = await RoomLink.GetStatusAsync(link);
+                if (status == null || status.Players.Count == 0) ShowFind("Couldn't read that room's players. Check the room link.");
+                else ShowRoomPlayers(status.Players.ToList());
+            }
+            finally { FindBtn.IsEnabled = true; }
+            return;
+        }
         var first = _slots.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Name));
         if (string.IsNullOrWhiteSpace(ServerBox.Text) || first == null)
         {
@@ -107,6 +161,14 @@ public partial class EditMultiworldPage : UserControl
                 .OfType<JsonObject>()
                 .Select(p => new RoomPlayer(p["slot"]!.GetValue<int>(), p["name"]!.GetValue<string>(), p["game"]!.GetValue<string>()))
                 .ToList();
+            ShowRoomPlayers(players);
+        }
+        finally { FindBtn.IsEnabled = true; }
+    }
+
+    private void ShowRoomPlayers(System.Collections.Generic.List<RoomPlayer> players)
+    {
+        {
             // Fill in games for the slots already listed.
             foreach (var s in _slots)
                 if (players.FirstOrDefault(p => p.Name.Equals(s.Name.Trim(), StringComparison.OrdinalIgnoreCase)) is { } p)
@@ -119,7 +181,6 @@ public partial class EditMultiworldPage : UserControl
             ShowFind(rest.Count == 0 ? $"All {players.Count} slots in this room are listed."
                                      : $"{players.Count} slots in this room. Click to add the ones you want to track.");
         }
-        finally { FindBtn.IsEnabled = true; }
     }
 
     private void AddPlayer_Click(object sender, RoutedEventArgs e)
@@ -156,7 +217,7 @@ public partial class EditMultiworldPage : UserControl
         string name = NameBox.Text.Trim();
         string server = ServerBox.Text.Trim();
         var slots = _slots.Where(s => !string.IsNullOrWhiteSpace(s.Name)).ToList();
-        string? error = server.Length == 0 ? "Enter the server address."
+        string? error = server.Length == 0 ? "Enter the server address (or a room link and wait a moment for it to be looked up)."
                       : slots.Count == 0 ? "Add at least one slot name."
                       : slots.GroupBy(s => s.Name.Trim(), StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1) ? "Each slot can only be listed once."
                       : null;
@@ -169,6 +230,7 @@ public partial class EditMultiworldPage : UserControl
         w.Server = server;
         w.Password = PasswordBox.Password;
         w.YamlFolder = YamlBox.Text.Trim();
+        w.RoomLink = RoomLink.Normalize(RoomBox.Text) ?? "";
         foreach (var s in slots) s.Name = s.Name.Trim();
         w.Slots = slots;
         if (_original == null) App.Config.Multiworlds.Add(w);

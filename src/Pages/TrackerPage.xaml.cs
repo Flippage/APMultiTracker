@@ -72,7 +72,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         _syncing = true;
         GroupToggle.IsChecked = App.Config.GroupByRegion;
         OverviewGroupToggle.IsChecked = App.Config.OverviewGroupByRegion;
-        ItemsToggle.IsChecked = false;
+        ItemsToggle.IsChecked = App.Config.ShowItems;
+        ExplainToggle.IsChecked = App.Config.ShowExplain;
         (App.Config.Filter switch
         {
             CheckFilter.Reachable => FReachPill,
@@ -533,6 +534,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     {
         if (_syncing) return;
         App.Config.GroupByRegion = GroupToggle.IsChecked == true;
+        App.Config.ShowItems = ItemsToggle.IsChecked == true;
+        App.Config.ShowExplain = ExplainToggle.IsChecked == true;
         App.SaveConfig();
         ApplyGrouping();
         RefreshList();

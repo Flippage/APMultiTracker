@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.0
+
+- **Follows archipelago.gg rooms to their new port**: a multiworld now has a **Room link** field (the room's page,
+  `https://archipelago.gg/room/…`). Paste it and the server address is filled in for you. When a game can't connect,
+  the app opens the room page to wake it, reads the room's current port and, if it changed, updates the multiworld
+  and reconnects. The feed notes the move. Ports are also checked at startup. Pasting a room link into the Server box
+  works too. With a room link, **Find slots in this room** lists every slot straight from the room page.
+- **Opens the way you left it**: the window's size, position and maximised state are remembered (if that screen is
+  still connected), along with the page you were on and the Tracker's Items and Explain toggles.
+
 ## v0.6.0
 
 - **Stays up to date when left running** (engine v0.4.0): a connection that dies silently (PC asleep, Wi-Fi drop,

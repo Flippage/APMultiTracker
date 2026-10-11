@@ -119,8 +119,10 @@ Your multiworlds and settings are kept. The tracker engine inside Archipelago up
 
 Hosted rooms work exactly like they do in UT (secure `wss://` connections are picked automatically). The server box
 also accepts a `/connect archipelago.gg:12345` line or an `archipelago://Slot:password@archipelago.gg:12345` link.
-Rooms on archipelago.gg go to sleep when nobody is connected and can come back on a **different port**: if a game
-won't connect, open the room page to wake it, and update the port in the multiworld if it changed.
+Rooms on archipelago.gg go to sleep when nobody is connected and can come back on a **different port**. Paste the
+room's page link (`https://archipelago.gg/room/…`) into the multiworld's **Room link** field and the app handles that
+for you: it fills in the server address, wakes the room when a game can't connect, and switches to the new port if
+the room moved. With a room link, **Find slots in this room** lists everyone without connecting.
 
 ### YAMLs
 
@@ -163,7 +165,8 @@ For engine development, point Settings → Archipelago folder at an Archipelago 
 
 ## Privacy
 
-Settings live in `%APPDATA%\APMultiTracker`. Room passwords and the optional Twitch token are encrypted for your
+Settings live in `%APPDATA%\APMultiTracker`, including the window's size and position, the page you were on and the
+Tracker's view toggles, so the app opens the way you left it. Room passwords and the optional Twitch token are encrypted for your
 Windows user (DPAPI). The engine only listens on 127.0.0.1 and requires a per-session token.
 
 ## Credits
