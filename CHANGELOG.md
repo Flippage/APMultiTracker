@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1
+
+- Fix: switching to All games after the app started on a focused game showed no checks until the window was
+  resized. The columns were sized before the view had ever been laid out (0 px tall). The self-test now starts on
+  a focused game and checks this.
+
 ## v0.4.0
 
 - **All games, grouped**: the All games view has its own "Group by region" option, with the same collapsible

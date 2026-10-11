@@ -54,6 +54,7 @@ public static class Demo
             },
             ActiveMultiworldId = mw.Id,
             ConnectedMultiworldIds = { mw.Id, "demo2" },
+            FocusByWorld = { [mw.Id] = "d1" },   // start on a game, like a real session (All games not laid out yet)
         };
     }
 

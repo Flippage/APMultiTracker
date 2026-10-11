@@ -154,8 +154,10 @@ public partial class App : Application
     {
         try
         {
-            Demo.Feed(Tracker);
+            Demo.Feed(Tracker);   // ends by switching from the focused game to All games
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(300);
+            window.TrackerView.AssertOverviewLaidOut();
             await window.SelfTestAsync();
             if (!window.IsVisible) throw new InvalidOperationException("Main window is not visible.");
             if (EngineHost.BundledEngineVersion == "0.0.0") throw new InvalidOperationException("The engine apworld isn't embedded.");

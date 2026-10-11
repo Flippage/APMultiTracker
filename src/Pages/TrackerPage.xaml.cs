@@ -39,6 +39,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateBanner);
         BoxArt.Changed += _ => { if (_shown != null) Art.SetUrl(FArt, _shown.ArtUrl); };
         SizeChanged += (_, _) => { UpdateColumnsWidth(); UpdateCompact(); FitExplainHeight(); };
+        OverviewScroll.SizeChanged += (_, _) => UpdateColumnsWidth();   // also fires when All games is first shown
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) RefreshAll(); };
 
         _syncing = true;
@@ -113,8 +114,16 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void UpdateColumnsWidth()
     {
         int n = App.Tracker.Slots.Count;
-        double avail = Math.Max(0, OverviewScroll.ActualWidth);
-        Columns.Width = n == 0 ? double.NaN : Math.Max(avail, n * 270);
+        double avail = OverviewScroll.ActualWidth;
+        // Not laid out yet (e.g. the view was hidden while a game was focused): size naturally for now;
+        // OverviewScroll.SizeChanged calls back once it has a real size.
+        if (n == 0 || avail <= 0 || OverviewScroll.ActualHeight <= 0)
+        {
+            Columns.Width = double.NaN;
+            Columns.Height = double.NaN;
+            return;
+        }
+        Columns.Width = Math.Max(avail, n * 270);
         Columns.Height = Math.Max(0, OverviewScroll.ActualHeight - (Columns.Width > avail + 1 ? 12 : 0));
     }
 
@@ -642,6 +651,13 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         RefreshList();
         App.Tracker.SetFocus(null);
         UpdateLayout();
+    }
+
+    /// <summary>Self-test: the All games columns have a real size (they once ended up 0px tall).</summary>
+    public void AssertOverviewLaidOut()
+    {
+        if (Columns.ActualHeight < 100 || Columns.ActualWidth < 100)
+            throw new InvalidOperationException($"All games columns are {Columns.ActualWidth:0}x{Columns.ActualHeight:0} after switching from a game.");
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
