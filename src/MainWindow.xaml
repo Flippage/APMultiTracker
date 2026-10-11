@@ -55,6 +55,9 @@
                         </DockPanel>
                         <Grid x:Name="FocusArtBox" HorizontalAlignment="Center" Margin="0,0,0,10">
                             <Border x:Name="FocusArt" Width="84" Height="112" CornerRadius="6" Background="#1F1F1F"/>
+                            <!-- All games: every game's box art in a small grid -->
+                            <UniformGrid x:Name="FocusCollage" Width="{Binding Width, ElementName=FocusArt}" Height="{Binding Height, ElementName=FocusArt}"
+                                         Visibility="Collapsed" IsHitTestVisible="False"/>
                             <Viewbox x:Name="FocusArtIdle" Width="34" Height="34" Opacity="0.25" IsHitTestVisible="False">
                                 <Path Style="{StaticResource Icon}" Data="{StaticResource IconGrid}" Stroke="{StaticResource TextBrush}"/>
                             </Viewbox>

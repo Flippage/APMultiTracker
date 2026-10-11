@@ -22,6 +22,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Wide enough for four full game columns, but never bigger than the screen.
+        var work = SystemParameters.WorkArea;
+        Width = Math.Min(1500, work.Width - 40);
+        Height = Math.Min(940, work.Height - 40);
         SourceInitialized += (_, _) => Native.StyleTitleBar(new WindowInteropHelper(this).Handle);
         Closing += OnClosing;
         Topmost = App.Config.AlwaysOnTop;
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
         App.Updater.Notice += downloaded => Dispatcher.InvokeAsync(() => QueueUpdateToast(downloaded));
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) ShowQueuedToast(); };
         App.Tracker.Changed += slot => { if (slot == null || App.Tracker.Focused == null || slot == App.Tracker.Focused) UpdateFocusCard(); };
+        BoxArt.Changed += _ => { if (App.Tracker.Focused == null) UpdateFocusCard(); };
         App.Tracker.FocusChanged += UpdateFocusCard;
         App.Tracker.FeedAdded += (world, m) =>
         {
@@ -156,6 +161,7 @@ public partial class MainWindow : Window
             FocusGame.Text = f.Title;
             FocusSlot.Text = f.SlotName;
             Art.SetUrl(FocusArt, f.ArtUrl);
+            FocusCollage.Visibility = Visibility.Collapsed;
             FocusArtIdle.Visibility = string.IsNullOrEmpty(f.ArtUrl) ? Visibility.Visible : Visibility.Collapsed;
             FocusCount.Text = f.HasData ? f.InLogic.ToString() : "–";
             FocusCountLabel.Text = " in logic";
@@ -174,7 +180,7 @@ public partial class MainWindow : Window
             FocusSlot.Text = mw == null ? "Set one up on Multiworlds" : $"{store.Slots.Count} games";
             Art.SetUrl(FocusArt, null);
             FocusArt.Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x1F, 0x1F));
-            FocusArtIdle.Visibility = Visibility.Visible;
+            FocusArtIdle.Visibility = BuildCollage(store.Slots) ? Visibility.Collapsed : Visibility.Visible;
             bool any = store.Slots.Any(s => s.HasData);
             FocusCount.Text = any ? store.Slots.Sum(s => s.InLogic).ToString() : "–";
             FocusCountLabel.Text = " in logic";
@@ -184,6 +190,26 @@ public partial class MainWindow : Window
             GoTag.Visibility = Visibility.Collapsed;
         }
         UpdateArtVisibility();
+    }
+
+    /// <summary>All games: a grid of every game's box art (2×2 up to 4 games, 3×3 up to 9…). False if there's no art yet.</summary>
+    private bool BuildCollage(System.Collections.Generic.IList<SlotView> slots)
+    {
+        var arts = slots.Where(s => !string.IsNullOrEmpty(s.ArtUrl)).Select(s => s.ArtUrl!).ToList();
+        FocusCollage.Children.Clear();
+        if (arts.Count == 0) { FocusCollage.Visibility = Visibility.Collapsed; return false; }
+        int cols = arts.Count == 1 ? 1 : (int)Math.Ceiling(Math.Sqrt(arts.Count));
+        int rows = (int)Math.Ceiling(arts.Count / (double)cols);
+        FocusCollage.Columns = cols;
+        FocusCollage.Rows = rows;
+        foreach (var url in arts)
+        {
+            var cell = new System.Windows.Controls.Border { CornerRadius = new CornerRadius(3), Margin = new Thickness(1) };
+            Art.SetUrl(cell, url);
+            FocusCollage.Children.Add(cell);
+        }
+        FocusCollage.Visibility = Visibility.Visible;
+        return true;
     }
 
     private void Focused_PropertyChanged(object? sender, PropertyChangedEventArgs e)

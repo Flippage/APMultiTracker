@@ -38,11 +38,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Tracker.FocusChanged += RefreshAll;
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateBanner);
         BoxArt.Changed += _ => { if (_shown != null) Art.SetUrl(FArt, _shown.ArtUrl); };
-        SizeChanged += (_, _) => UpdateColumnsWidth();
+        SizeChanged += (_, _) => { UpdateColumnsWidth(); UpdateCompact(); FitExplainHeight(); };
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) RefreshAll(); };
 
         _syncing = true;
         GroupToggle.IsChecked = App.Config.GroupByRegion;
+        OverviewGroupToggle.IsChecked = App.Config.OverviewGroupByRegion;
         ItemsToggle.IsChecked = false;
         (App.Config.Filter switch
         {
@@ -112,9 +113,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void UpdateColumnsWidth()
     {
         int n = App.Tracker.Slots.Count;
-        double avail = Math.Max(0, OverviewView.ActualWidth);
+        double avail = Math.Max(0, OverviewScroll.ActualWidth);
         Columns.Width = n == 0 ? double.NaN : Math.Max(avail, n * 270);
-        Columns.Height = Math.Max(0, OverviewView.ActualHeight - (Columns.Width > avail + 1 ? 12 : 0));
+        Columns.Height = Math.Max(0, OverviewScroll.ActualHeight - (Columns.Width > avail + 1 ? 12 : 0));
     }
 
     private void SyncTileChecks()
@@ -224,11 +225,25 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.SaveConfig();
     }
 
+    /// <summary>The slot a region group belongs to: the focused game, or an overview column's game.</summary>
+    private SlotView? SlotOfGroup(DependencyObject d)
+    {
+        var list = FindAncestor<ListBox>(d);
+        if (list == null || list == CheckListBox) return _shown;
+        return list.DataContext as SlotView;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
+    {
+        while (d != null && d is not T) d = VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d);
+        return d as T;
+    }
+
     private void ApplyGroupState(GroupItem g)
     {
-        if (_shown == null || g.DataContext is not CollectionViewGroup group) return;
+        if (g.DataContext is not CollectionViewGroup group || SlotOfGroup(g) is not SlotView slot) return;
         g.ApplyTemplate();
-        bool collapsed = CollapsedFor(_shown).Contains(group.Name?.ToString() ?? "");
+        bool collapsed = CollapsedFor(slot).Contains(group.Name?.ToString() ?? "");
         if (g.Template.FindName("Items", g) is UIElement items)
             items.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
         if (g.Template.FindName("Chevron", g) is FrameworkElement chevron)
@@ -239,23 +254,67 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
     private void GroupHeader_Click(object sender, MouseButtonEventArgs e)
     {
-        if (_shown == null || (sender as FrameworkElement)?.DataContext is not CollectionViewGroup group) return;
+        if (sender is not FrameworkElement fe || fe.DataContext is not CollectionViewGroup group) return;
+        var list = FindAncestor<ListBox>(fe);
+        if (list == null || SlotOfGroup(fe) is not SlotView slot) return;
         string name = group.Name?.ToString() ?? "";
-        var collapsed = CollapsedFor(_shown);
+        var collapsed = CollapsedFor(slot);
         bool collapse = !collapsed.Contains(name);
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
-            // Ctrl+click: every region follows this one.
-            var all = _view.Groups.OfType<CollectionViewGroup>().Select(gr => gr.Name?.ToString() ?? "");
-            SaveCollapsed(_shown, collapse ? collapsed.Union(all) : collapsed.Except(all));
+            // Ctrl+click: every region in this list follows this one.
+            var all = (list.Items.Groups ?? new System.Collections.ObjectModel.ReadOnlyObservableCollection<object>(new()))
+                .OfType<CollectionViewGroup>().Select(gr => gr.Name?.ToString() ?? "");
+            SaveCollapsed(slot, collapse ? collapsed.Union(all) : collapsed.Except(all));
         }
         else
         {
             if (collapse) collapsed.Add(name); else collapsed.Remove(name);
-            SaveCollapsed(_shown, collapsed);
+            SaveCollapsed(slot, collapsed);
         }
-        foreach (var g in FindGroupItems(CheckListBox)) ApplyGroupState(g);
+        foreach (var g in FindGroupItems(list)) ApplyGroupState(g);
         e.Handled = true;
+    }
+
+    /// <summary>Demo/self-test: flip the overview's "Group by region" toggle.</summary>
+    public void SetOverviewGrouping(bool on) => OverviewGroupToggle.IsChecked = on;
+
+    private void OverviewGroup_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncing) return;
+        App.Config.OverviewGroupByRegion = OverviewGroupToggle.IsChecked == true;
+        App.SaveConfig();
+        foreach (var s in App.Tracker.Slots) s.ApplyOverviewGrouping();
+    }
+
+    // ------------------------------------------------------------------ layout on small windows
+
+    /// <summary>Short windows: drop the big box art from the game header (the sidebar already shows it).</summary>
+    private void UpdateCompact()
+    {
+        bool compact = ActualHeight > 0 && ActualHeight < 900;
+        FArtBox.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        FHeader.Padding = compact ? new Thickness(16, 10, 12, 4) : new Thickness(16);
+        FTitle.FontSize = compact ? 18 : 22;
+        ViewToggles.Margin = compact ? new Thickness(0, 40, 4, 4) : new Thickness(0, 44, 4, 6);
+        // Narrow windows: a smaller search box keeps search + filters on one line.
+        Search.Width = double.NaN;
+        if (Search.Parent is FrameworkElement box) box.Width = ActualWidth > 0 && ActualWidth < 1000 ? 180 : 240;
+    }
+
+    /// <summary>Keep at least a few checks visible: the explain panel never takes more than the room left over.</summary>
+    private void FitExplainHeight()
+    {
+        if (ExplainToggle.IsChecked != true || ExplainRow.Parent is not Grid grid || grid.ActualHeight <= 0) return;
+        double max = Math.Max(120, Math.Min(grid.ActualHeight - 10 - 130, grid.ActualHeight * 0.55));
+        double want = Math.Min(App.Config.ExplainHeight, max);
+        if (Math.Abs(ExplainRow.ActualHeight - want) > 1) ExplainRow.Height = new GridLength(want);
+    }
+
+    private void ExplainSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        App.Config.ExplainHeight = Math.Round(ExplainRow.ActualHeight);
+        App.SaveConfig();
     }
 
     private static IEnumerable<GroupItem> FindGroupItems(DependencyObject root)
@@ -276,7 +335,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             if (App.Config.GroupByRegion) _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CheckItem.Region)));
         }
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowRegionLine)));
-        ExplainPanel.Visibility = ExplainToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        bool explain = ExplainToggle.IsChecked == true;
+        ExplainPanel.Visibility = explain ? Visibility.Visible : Visibility.Collapsed;
+        ExplainSplitter.Visibility = ExplainPanel.Visibility;
+        ExplainRow.MinHeight = explain ? 120 : 0;
+        ExplainRow.Height = new GridLength(explain ? App.Config.ExplainHeight : 0);
+        FitExplainHeight();
         ItemsCol.Width = ItemsToggle.IsChecked == true ? new GridLength(280) : new GridLength(0);
         ItemsPanel.Visibility = ItemsToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -410,10 +474,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ExplainToggle.IsChecked = true;
         ExplainQuery.Text = query;
         int seq = ++_explainSeq;
-        ExplainStatus.Text = mode == "path" ? $"Finding a path to {query}\u2026" : $"Explaining {query}\u2026";
-        ExplainStatus.Visibility = Visibility.Visible;
-        ExplainOutput.Opacity = 0.35;   // keep the last answer in place so nothing jumps while this one loads
-        ExplainBtn.IsEnabled = PathBtn.IsEnabled = false;
+        SetExplainMode(mode);
+        // The last answer stays put until the new one arrives; only a slow answer shows a status line.
+        _ = ShowStatusIfSlowAsync(seq, mode == "path" ? $"Finding a path to {query}\u2026" : $"Explaining {query}\u2026");
         try
         {
             if (!App.Engine.Client.IsConnected) { ShowExplain("The tracker engine isn't running.", "red"); return; }
@@ -440,12 +503,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         }
         finally
         {
-            if (seq == _explainSeq)
-            {
-                ExplainBtn.IsEnabled = PathBtn.IsEnabled = true;
-                ExplainStatus.Visibility = Visibility.Collapsed;
-                ExplainOutput.Opacity = 1;
-            }
+            if (seq == _explainSeq) ExplainStatus.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -453,6 +511,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     public void RenderExplain(string mode, string query, JsonArray lines)
     {
         ExplainToggle.IsChecked = true;
+        SetExplainMode(mode);
         ExplainQuery.Text = query;
         {
             ExplainOutput.Children.Clear();
@@ -464,8 +523,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                 Text = (mode == "path" ? "LOGICAL PATH TO " : "EXPLAIN \u00b7 ") + query.ToUpperInvariant()
                        + $"   \u00b7   {DateTime.Now:HH:mm:ss}",
             });
-            // A short fade so a new answer is visible even when it reads the same as the last one.
-            ExplainOutput.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.2, 1, TimeSpan.FromMilliseconds(220)));
+
             foreach (var line in lines.OfType<JsonArray>())
             {
                 var tb = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 3),
@@ -481,10 +539,23 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         }
     }
 
+    private async System.Threading.Tasks.Task ShowStatusIfSlowAsync(int seq, string text)
+    {
+        await System.Threading.Tasks.Task.Delay(300);
+        if (seq != _explainSeq) return;
+        ExplainStatus.Text = text;
+        ExplainStatus.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>The button for the answer being shown is the highlighted one.</summary>
+    private void SetExplainMode(string mode)
+    {
+        ExplainBtn.Style = (Style)FindResource(mode == "path" ? "OutlineButton" : "AccentButton");
+        PathBtn.Style = (Style)FindResource(mode == "path" ? "AccentButton" : "OutlineButton");
+    }
+
     private void ShowExplain(string text, string? color)
     {
-        ExplainOutput.BeginAnimation(OpacityProperty, null);
-        ExplainOutput.Opacity = 1;
         ExplainOutput.Children.Clear();
         ExplainOutput.Children.Add(new TextBlock { Text = text, FontSize = 13, TextWrapping = TextWrapping.Wrap,
                                                    Foreground = ExplainColor(color) ?? (Brush)FindResource("SubBrush") });

@@ -31,7 +31,7 @@ in one place, with a faster, cleaner interface.
 
 | | |
 |---|---|
-| 🧭 **All games at once** | Every slot's in-logic checks side by side, with live counts. |
+| 🧭 **All games at once** | Every slot's in-logic checks side by side, with live counts, optionally grouped by region. |
 | 🎯 **Focus one game** | Big check list with search, filters (In logic, + Glitched, All remaining, Hinted, Hidden), collapsible region groups and received items. |
 | ⌨️ **Fast switching** | Click a game tile, or Ctrl+1…9, Ctrl+0 for all games, Ctrl+Tab to step through. |
 | 🔎 **Explain & logical path** | Why is something in or out of logic? UT's `/explain` and `/get_logical_path`, one double-click away. |
@@ -47,11 +47,15 @@ in one place, with a faster, cleaner interface.
   <img src="docs/screenshots/focused.png" alt="One game focused" width="900">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/overview-grouped.png" alt="All games, grouped by region" width="900">
+</p>
+
 ## Explain and logical path
 
 Double-click a check (or right-click → **Explain** / **Show logical path**), or turn on **Explain** and type any
 location, region or entrance (close spellings are fine). It runs Universal Tracker's own `/explain` and
-`/get_logical_path`, so the results are identical, just easier to read.
+`/get_logical_path`, so the results are identical, just easier to read. Drag the panel's top edge to resize it.
 
 <p align="center">
   <img src="docs/screenshots/explain.png" alt="Logical path to a check" width="900">

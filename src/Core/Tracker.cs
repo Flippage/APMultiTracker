@@ -84,7 +84,14 @@ public sealed class SlotView : INotifyPropertyChanged
     public SlotRef Ref { get; }
     public int Index { get; set; }
 
-    public SlotView(SlotRef slot) { Ref = slot; _game = slot.Game; }
+    public SlotView(SlotRef slot)
+    {
+        Ref = slot;
+        _game = slot.Game;
+        OverviewView = new System.Windows.Data.ListCollectionView(Overview);
+        if (App.Config.OverviewGroupByRegion)
+            OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.Region)));
+    }
 
     private string _game;
     public string Game { get => _game; set { if (Set(ref _game, value)) { Notify(nameof(Title)); LoadArt(); } } }
@@ -115,6 +122,29 @@ public sealed class SlotView : INotifyPropertyChanged
 
     /// <summary>In-logic (then glitched) checks for the all-games overview, kept in place between updates.</summary>
     public ObservableCollection<CheckItem> Overview { get; } = new();
+    /// <summary>The overview list as shown: optionally grouped by region.</summary>
+    public System.Windows.Data.ListCollectionView OverviewView { get; }
+
+    /// <summary>Re-sort and (un)group the overview after the "Group by region" setting changes.</summary>
+    public void ApplyOverviewGrouping()
+    {
+        using (OverviewView.DeferRefresh())
+        {
+            OverviewView.GroupDescriptions.Clear();
+            if (App.Config.OverviewGroupByRegion)
+                OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.Region)));
+        }
+        ListSync.Sync(Overview, SortOverview(Locations));
+    }
+
+    private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
+    {
+        var shown = locs.Where(l => l.Status is "in_logic" or "glitched");
+        return (App.Config.OverviewGroupByRegion
+                ? shown.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
+                : shown.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
+            .ToList();
+    }
 
     public bool IsTracking => Status == "tracking";
     public bool IsBusy => Status is "connecting" or "generating" or "reconnecting";
@@ -206,9 +236,7 @@ public sealed class SlotView : INotifyPropertyChanged
                  ?? new List<string>();
         HasData = true;
 
-        var overview = locs.Where(l => l.Status is "in_logic" or "glitched")
-            .OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance).ToList();
-        ListSync.Sync(Overview, overview);
+        ListSync.Sync(Overview, SortOverview(locs));
         NotifyAll();
     }
 

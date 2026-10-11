@@ -5,6 +5,78 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="Vis"/>
 
+        <!-- Collapsible region groups (click a header; Ctrl+click for all) -->
+        <GroupStyle x:Key="RegionGroups">
+            <GroupStyle.ContainerStyle>
+                <Style TargetType="GroupItem">
+                    <EventSetter Event="Loaded" Handler="Group_Loaded"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="GroupItem">
+                                <StackPanel>
+                                    <Border x:Name="Head" Background="Transparent" Cursor="Hand" CornerRadius="6"
+                                            Padding="6,8,8,6" Margin="4,4,4,0" MouseLeftButtonUp="GroupHeader_Click"
+                                            ToolTip="Click to collapse or expand. Ctrl+click: all regions.">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Viewbox x:Name="Chevron" Width="10" Height="10" Margin="0,1,8,0" RenderTransformOrigin="0.5,0.5">
+                                                <Viewbox.RenderTransform>
+                                                    <RotateTransform Angle="0"/>
+                                                </Viewbox.RenderTransform>
+                                                <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource AccentBrush}" StrokeThickness="3"/>
+                                            </Viewbox>
+                                            <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            <TextBlock Text="{Binding ItemCount}" FontSize="11.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ItemsPresenter x:Name="Items"/>
+                                </StackPanel>
+                                <ControlTemplate.Triggers>
+                                    <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </GroupStyle.ContainerStyle>
+        </GroupStyle>
+        <GroupStyle x:Key="MiniRegionGroups">
+            <GroupStyle.ContainerStyle>
+                <Style TargetType="GroupItem">
+                    <EventSetter Event="Loaded" Handler="Group_Loaded"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="GroupItem">
+                                <StackPanel>
+                                    <Border x:Name="Head" Background="Transparent" Cursor="Hand" CornerRadius="6"
+                                            Padding="4,6,6,4" Margin="0,2,4,0" MouseLeftButtonUp="GroupHeader_Click"
+                                            ToolTip="Click to collapse or expand. Ctrl+click: all regions.">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Viewbox x:Name="Chevron" Width="9" Height="9" Margin="0,1,6,0" RenderTransformOrigin="0.5,0.5">
+                                                <Viewbox.RenderTransform>
+                                                    <RotateTransform Angle="0"/>
+                                                </Viewbox.RenderTransform>
+                                                <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource AccentBrush}" StrokeThickness="3"/>
+                                            </Viewbox>
+                                            <TextBlock Text="{Binding Name}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            <TextBlock Text="{Binding ItemCount}" FontSize="10.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ItemsPresenter x:Name="Items"/>
+                                </StackPanel>
+                                <ControlTemplate.Triggers>
+                                    <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </GroupStyle.ContainerStyle>
+        </GroupStyle>
+
         <!-- One check row (focused view) -->
         <DataTemplate x:Key="CheckRow" DataType="{x:Type local:CheckItem}">
             <Grid Background="Transparent" ToolTip="{Binding StatusTip}">
@@ -163,7 +235,13 @@
         </DockPanel>
 
         <!-- ===================== All games ===================== -->
-        <ScrollViewer x:Name="OverviewView" Grid.Row="3" Margin="0,8,0,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <DockPanel x:Name="OverviewView" Grid.Row="3" Margin="0,4,0,0">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <CheckBox x:Name="OverviewGroupToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}" Content="Group by region"
+                      FontSize="12.5" Checked="OverviewGroup_Changed" Unchecked="OverviewGroup_Changed"/>
+            <TextBlock Text="IN LOGIC NOW" Style="{StaticResource Caps}" VerticalAlignment="Center"/>
+        </DockPanel>
+        <ScrollViewer x:Name="OverviewScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
             <ItemsControl x:Name="Columns" Focusable="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -204,8 +282,11 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <ListBox Style="{StaticResource CheckList}" ItemsSource="{Binding Overview}" ItemTemplate="{StaticResource MiniRow}"
+                                <ListBox Style="{StaticResource CheckList}" ItemsSource="{Binding OverviewView}" ItemTemplate="{StaticResource MiniRow}"
                                          Background="Transparent" Padding="0" MouseDoubleClick="Column_DoubleClick">
+                                    <ListBox.GroupStyle>
+                                        <StaticResource ResourceKey="MiniRegionGroups"/>
+                                    </ListBox.GroupStyle>
                                     <ListBox.ItemContainerStyle>
                                         <Style TargetType="ListBoxItem" BasedOn="{StaticResource PlainRow}">
                                             <Setter Property="Padding" Value="0"/>
@@ -232,6 +313,7 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
+        </DockPanel>
 
         <!-- ===================== One game ===================== -->
         <Grid x:Name="FocusView" Grid.Row="3" Margin="0,8,0,0" Visibility="Collapsed">
@@ -242,9 +324,9 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Style="{StaticResource Card}" Padding="16">
+            <Border x:Name="FHeader" Style="{StaticResource Card}" Padding="16">
                 <DockPanel>
-                    <Grid DockPanel.Dock="Left" Cursor="Hand" MouseLeftButtonUp="Art_Click" ToolTip="Change box art">
+                    <Grid x:Name="FArtBox" DockPanel.Dock="Left" Cursor="Hand" MouseLeftButtonUp="Art_Click" ToolTip="Change box art">
                         <Border x:Name="FArt" Width="78" Height="104" CornerRadius="6" Background="#1F1F1F"/>
                         <Border Width="26" Height="26" CornerRadius="13" Background="#CC000000" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4">
                             <Viewbox Width="13" Height="13">
@@ -252,10 +334,19 @@
                             </Viewbox>
                         </Border>
                     </Grid>
-                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Top" Orientation="Horizontal">
-                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}"
+                    <Grid DockPanel.Dock="Right" Margin="12,0,0,0">
+                        <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 ToolTip="Rebuild this game's logic (re-reads its YAML)" Click="RefreshOne_Click"/>
-                    </StackPanel>
+                        <StackPanel x:Name="ViewToggles" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,44,4,6">
+                            <CheckBox x:Name="GroupToggle" Style="{StaticResource Toggle}" Content="Group by region" FontSize="12.5"
+                                      Checked="View_Changed" Unchecked="View_Changed"/>
+                            <CheckBox x:Name="ItemsToggle" Style="{StaticResource Toggle}" Content="Items" FontSize="12.5" Margin="18,0,0,0"
+                                      Checked="View_Changed" Unchecked="View_Changed"/>
+                            <CheckBox x:Name="ExplainToggle" Style="{StaticResource Toggle}" Content="Explain" FontSize="12.5" Margin="18,0,0,0"
+                                      Checked="View_Changed" Unchecked="View_Changed"
+                                      ToolTip="Why is a check (or region) in or out of logic? Same as UT's /explain and /get_logical_path"/>
+                        </StackPanel>
+                    </Grid>
                     <StackPanel Margin="18,2,8,0">
                         <TextBlock x:Name="FTitle" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="FSub" FontSize="13" Foreground="{StaticResource SubBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
@@ -309,23 +400,14 @@
 
             <!-- Toolbar -->
             <DockPanel Grid.Row="2" Margin="0,14,0,10">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <CheckBox x:Name="GroupToggle" Style="{StaticResource Toggle}" Content="Group by region" FontSize="12.5"
-                              Checked="View_Changed" Unchecked="View_Changed"/>
-                    <CheckBox x:Name="ItemsToggle" Style="{StaticResource Toggle}" Content="Items" FontSize="12.5" Margin="18,0,0,0"
-                              Checked="View_Changed" Unchecked="View_Changed"/>
-                    <CheckBox x:Name="ExplainToggle" Style="{StaticResource Toggle}" Content="Explain" FontSize="12.5" Margin="18,0,0,0"
-                              Checked="View_Changed" Unchecked="View_Changed"
-                              ToolTip="Why is a check (or region) in or out of logic? Same as UT's /explain and /get_logical_path"/>
-                </StackPanel>
-                <Grid Width="240" DockPanel.Dock="Left" Margin="0,0,12,0">
-                    <TextBox x:Name="Search" Style="{StaticResource Field}" MinHeight="36" Padding="34,0,10,0" FontSize="13"
+                <Grid DockPanel.Dock="Left" Width="240" Margin="0,0,12,0" VerticalAlignment="Top">
+                    <TextBox x:Name="Search" Style="{StaticResource Field}" MinHeight="36" Height="36" Padding="34,0,10,0" FontSize="13"
                              Tag="Search checks…" TextChanged="Search_TextChanged"/>
                     <Viewbox Width="15" Height="15" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False">
                         <Path Style="{StaticResource Icon}" Data="{StaticResource IconSearch}" Stroke="{StaticResource SubBrush}"/>
                     </Viewbox>
                 </Grid>
-                <WrapPanel VerticalAlignment="Center">
+                <WrapPanel VerticalAlignment="Top" Margin="0,2,0,0">
                     <RadioButton x:Name="FInLogicPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="InLogic"
                                  ToolTip="Checks you can do right now">In logic</RadioButton>
                     <RadioButton x:Name="FReachPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Reachable"
@@ -345,8 +427,9 @@
                     <ColumnDefinition x:Name="ItemsCol" Width="0"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition x:Name="ListRow" Height="*" MinHeight="90"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition x:Name="ExplainRow" Height="0"/>
                 </Grid.RowDefinitions>
                 <ListBox x:Name="CheckListBox" Style="{StaticResource CheckList}" ItemTemplate="{StaticResource CheckRow}"
                          MouseDoubleClick="CheckList_DoubleClick">
@@ -360,41 +443,7 @@
                         </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.GroupStyle>
-                        <GroupStyle>
-                            <GroupStyle.ContainerStyle>
-                                <Style TargetType="GroupItem">
-                                    <EventSetter Event="Loaded" Handler="Group_Loaded"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="GroupItem">
-                                                <StackPanel>
-                                                    <Border x:Name="Head" Background="Transparent" Cursor="Hand" CornerRadius="6"
-                                                            Padding="6,8,8,6" Margin="4,4,4,0" MouseLeftButtonUp="GroupHeader_Click"
-                                                            ToolTip="Click to collapse or expand. Ctrl+click: all regions.">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <Viewbox x:Name="Chevron" Width="10" Height="10" Margin="0,1,8,0" RenderTransformOrigin="0.5,0.5">
-                                                                <Viewbox.RenderTransform>
-                                                                    <RotateTransform Angle="0"/>
-                                                                </Viewbox.RenderTransform>
-                                                                <Path Style="{StaticResource Icon}" Data="M6,9 L12,15 L18,9" Stroke="{StaticResource AccentBrush}" StrokeThickness="3"/>
-                                                            </Viewbox>
-                                                            <TextBlock Text="{Binding Name}" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                                                            <TextBlock Text="{Binding ItemCount}" FontSize="11.5" Foreground="{StaticResource SubBrush}" Margin="8,0,0,0"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                    <ItemsPresenter x:Name="Items"/>
-                                                </StackPanel>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </GroupStyle.ContainerStyle>
-                        </GroupStyle>
+                        <StaticResource ResourceKey="RegionGroups"/>
                     </ListBox.GroupStyle>
                 </ListBox>
                 <StackPanel x:Name="ListEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
@@ -405,14 +454,27 @@
                     <TextBlock x:Name="ListEmptySub" Style="{StaticResource Sub}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
 
+                <!-- Drag to resize the explain panel -->
+                <GridSplitter x:Name="ExplainSplitter" Grid.Row="1" Height="10" HorizontalAlignment="Stretch" Background="Transparent"
+                              ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Cursor="SizeNS" Visibility="Collapsed"
+                              ToolTip="Drag to resize" DragCompleted="ExplainSplitter_DragCompleted">
+                    <GridSplitter.Template>
+                        <ControlTemplate TargetType="GridSplitter">
+                            <Grid Background="Transparent">
+                                <Border Width="44" Height="4" CornerRadius="2" Background="#333333" VerticalAlignment="Center"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </GridSplitter.Template>
+                </GridSplitter>
+
                 <!-- Explain / logical path (UT's /explain and /get_logical_path) -->
-                <Border x:Name="ExplainPanel" Grid.Row="1" Margin="0,10,0,0" Background="{StaticResource CardBrush}" CornerRadius="12"
+                <Border x:Name="ExplainPanel" Grid.Row="2" Background="{StaticResource CardBrush}" CornerRadius="12"
                         Padding="14,12" Visibility="Collapsed">
                     <DockPanel>
                         <DockPanel DockPanel.Dock="Top">
                             <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Tag="{StaticResource IconClose}" Width="36" Height="36"
                                     Margin="6,0,0,0" ToolTip="Close" Click="ExplainClose_Click"/>
-                            <Button x:Name="PathBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="36" Padding="14,0" FontSize="13"
+                            <Button x:Name="PathBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="36" Padding="16,0" FontSize="13"
                                     Content="Logical path" Margin="8,0,0,0" Click="Path_Click"
                                     ToolTip="How to reach it with what you have (UT's /get_logical_path). Shift+Enter in the box."/>
                             <Button x:Name="ExplainBtn" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
@@ -423,7 +485,7 @@
                         </DockPanel>
                         <TextBlock x:Name="ExplainStatus" DockPanel.Dock="Top" FontSize="12" Foreground="{StaticResource AccentBrush}"
                                    Margin="2,8,0,0" Visibility="Collapsed"/>
-                        <ScrollViewer x:Name="ExplainScroll" Height="220" Margin="2,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer x:Name="ExplainScroll" Margin="2,10,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel x:Name="ExplainOutput">
                                 <TextBlock Style="{StaticResource Sub}" FontSize="13"
                                            Text="Double-click a check, right-click it, or type a name above."/>
@@ -432,7 +494,7 @@
                     </DockPanel>
                 </Border>
 
-                <Border x:Name="ItemsPanel" Grid.Column="1" Grid.RowSpan="2" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
+                <Border x:Name="ItemsPanel" Grid.Column="1" Grid.RowSpan="3" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
                     <DockPanel>
                         <TextBlock x:Name="ItemsHeader" DockPanel.Dock="Top" Style="{StaticResource Caps}" Margin="2,0,0,8"/>
                         <ListBox x:Name="ItemsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0">

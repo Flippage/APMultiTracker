@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.0
+
+- **All games, grouped**: the All games view has its own "Group by region" option, with the same collapsible
+  regions (click a header, Ctrl+click for all).
+- **Box art collage**: with All games selected, the sidebar shows every game's box art in a small grid.
+- **Explain panel**: no more flicker (the last answer stays until the new one replaces it), the button for the
+  answer you're looking at is highlighted, and you can drag the panel's top edge to resize it.
+- **Smaller windows**: the view toggles moved into the game's header card, so search and filters stay on one line;
+  on shorter windows the header goes compact and the Explain panel never takes more than about half the space.
+- **Bigger default window**: wide enough for four full game columns without a scrollbar.
+- The search box no longer stretches tall when the filters wrap.
+
 ## v0.3.1
 
 - **Collapsible regions**: click a region header in the check list to collapse or expand it; Ctrl+click does every

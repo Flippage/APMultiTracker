@@ -139,7 +139,7 @@ public static class Demo
     public static async Task ScreenshotsAsync(MainWindow w, string dir)
     {
         Directory.CreateDirectory(dir);
-        w.Width = 1400; w.Height = 900;
+        w.Width = 1400; w.Height = 940;
         Feed(App.Tracker);
         await Task.Delay(2500);   // box art
         async Task Shot(string name)
@@ -155,6 +155,10 @@ public static class Demo
         w.GoToTracker();
         App.Tracker.SetFocus(null);
         await Shot("overview");
+        w.TrackerView.SetOverviewGrouping(true);
+        await Shot("overview-grouped");
+        w.TrackerView.SetOverviewGrouping(false);
+
         App.Tracker.SetFocus(App.Tracker.Slots[0]);
         await Shot("focused");
         App.Tracker.SetFocus(App.Tracker.Slots[1]);
@@ -179,5 +183,19 @@ public static class Demo
         w.CloseMultiworldEditor();
         w.GoToSettings();
         await Shot("settings");
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_SMALL") == "1")
+        {
+            // Checks the layout at a smaller window size (not used for the README).
+            w.GoToTracker();
+            w.Width = 1325; w.Height = 893;
+            App.Tracker.SetFocus(App.Tracker.Slots[0]);
+            w.TrackerView.RenderExplain("path", "Mantis_Claw", new JsonArray(
+                new JsonArray(new JsonObject { ["text"] = "Menu -> King's Pass", ["color"] = "blue" }),
+                new JsonArray(new JsonObject { ["text"] = "->", ["color"] = "" }, new JsonObject { ["text"] = "Mantis_Claw", ["color"] = "green" })));
+            await Shot("small-focused-explain");
+            App.Tracker.SetFocus(null);
+            w.GoToTracker();
+            await Shot("small-overview");
+        }
     }
 }
