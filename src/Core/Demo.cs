@@ -201,6 +201,29 @@ public static class Demo
         w.CloseMultiworldEditor();
         w.GoToSettings();
         await Shot("settings");
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_FEED") == "1")
+        {
+            // Checks the docked feed's limits at a typical window size (not used for the README).
+            w.GoToTracker();
+            w.Width = 1486; w.Height = 933;
+            App.Config.ShowFeedInTracker = true;
+            foreach (var (dock, size, name) in new[] { ("Right", 400.0, "feedcheck-right-default"), ("Right", 2000.0, "feedcheck-right-dragged-wide"),
+                                                      ("Bottom", 2000.0, "feedcheck-bottom-dragged-tall") })
+            {
+                App.Config.FeedDock = dock;
+                if (dock == "Right") App.Config.FeedDockWidth = size; else App.Config.FeedDockHeight = size;
+                w.TrackerView.ApplyFeedDock();
+                App.Tracker.SetFocus(null);
+                await Shot(name);
+            }
+            App.Config.FeedDock = "Right"; App.Config.FeedDockWidth = 400;
+            w.TrackerView.ApplyFeedDock();
+            App.Tracker.SetFocus(App.Tracker.Slots[3]);
+            await Shot("feedcheck-right-focused");
+            App.Config.ShowFeedInTracker = false;
+            w.TrackerView.ApplyFeedDock();
+            w.Width = 1400; w.Height = 940;
+        }
         if (Environment.GetEnvironmentVariable("APMT_SHOT_SMALL") == "1")
         {
             // Checks the layout at a smaller window size (not used for the README).

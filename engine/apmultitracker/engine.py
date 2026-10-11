@@ -30,6 +30,10 @@ from worlds import AutoWorld
 from . import ENGINE_VERSION
 
 DEFAULT_PORT = 38291
+# A slot that hears nothing from its server for this long is treated as dead and reconnects. Archipelago sends a
+# keep-alive every 100 s and the server echoes it, so a live connection is never this quiet.
+STALE_SECONDS = float(os.environ.get("APMT_STALE_SECONDS", "240"))
+MAX_RETRY_SECONDS = 30   # CommonClient doubles its reconnect delay forever; we cap it
 PERSIST_KEY = "apmultitracker"
 
 log = logging.getLogger("APMultiTracker")
@@ -111,7 +115,11 @@ class SlotContext(CommonContext):
         self.persist_id = ""
         self.room_seed = ""
         self.warning = ""
+        self.last_packet = time.monotonic()
+        self.last_attempt = time.monotonic()
+        self.retry_failed_connect = False   # first connection failed (e.g. room asleep): keep trying
         self.updater_task = asyncio.create_task(self._updater(), name=f"updater {sid}")
+        self.watchdog_task = asyncio.create_task(self._watchdog(), name=f"watchdog {sid}")
 
     # ---- connection
 
@@ -120,6 +128,9 @@ class SlotContext(CommonContext):
             self.set_status("error", "This room needs a password.")
             await self.disconnect(False)
             return
+        # CommonClient clears .auth when a connection closes and would otherwise ask the (absent) console for it.
+        if not self.auth:
+            self.auth = self.slot_name
         await self.get_username()
         await self.send_connect(game="")
 
@@ -133,12 +144,16 @@ class SlotContext(CommonContext):
 
     def handle_connection_loss(self, msg: str) -> None:
         log.warning(f"[{self.slot_name}] {msg}")
+        self.current_reconnect_delay = min(self.current_reconnect_delay, MAX_RETRY_SECONDS)
+        self.retry_failed_connect = not self.username and not self.disconnected_intentionally
         if "archipelago.gg" in self.requested_server.lower() and not self.logic_ready:
             # Hosted rooms sleep after a while idle and can come back on a different port.
             msg += (" If the room has been idle, open its page on archipelago.gg to wake it up, "
                     "and check the port hasn't changed.")
         if self.username and not self.disconnected_intentionally:
             self.set_status("reconnecting", msg + " Reconnecting…")
+        elif self.retry_failed_connect:
+            self.set_status("reconnecting", msg + " Trying again every minute…")
         else:
             self.set_status("error", msg)
 
@@ -155,6 +170,10 @@ class SlotContext(CommonContext):
             log.error(traceback.format_exc())
 
     def on_package(self, cmd: str, args: dict):
+        self.last_packet = time.monotonic()   # anything from the server proves the connection is alive
+        if cmd == "Connected":
+            self.retry_failed_connect = False
+            self.current_reconnect_delay = self.starting_reconnect_delay
         try:
             if cmd == "RoomInfo":
                 self.room_seed = args.get("seed_name", "")
@@ -521,9 +540,48 @@ class SlotContext(CommonContext):
             raise EngineError(f"{self.slot_name} isn't connected right now.")
         await self.send_msgs([{"cmd": "Say", "text": text}])
 
+    # ---- staying connected
+
+    def _socket_open(self) -> bool:
+        return bool(self.server and self.server.socket is not None and not self.server.socket.closed)
+
+    async def _watchdog(self):
+        """Notices connections that died silently (PC slept, network dropped) and keeps retrying ones that failed."""
+        tick = min(15.0, max(1.0, STALE_SECONDS / 8))
+        while True:
+            await asyncio.sleep(tick)
+            if self.status == "stopped":
+                return
+            self.current_reconnect_delay = min(self.current_reconnect_delay, MAX_RETRY_SECONDS)
+            now = time.monotonic()
+            try:
+                if self._socket_open() and self.slot is not None:
+                    quiet = now - self.last_packet
+                    if quiet > STALE_SECONDS:
+                        log.warning(f"[{self.slot_name}] Nothing from the server for {quiet:.0f}s; reconnecting")
+                        self.set_status("reconnecting", "The connection went quiet. Reconnecting…")
+                        try:
+                            await asyncio.wait_for(self.server.socket.close(), 10)
+                        except Exception:
+                            pass
+                        # server_loop ends, and CommonClient's auto-reconnect takes over (delay capped above)
+                    elif quiet > STALE_SECONDS / 2:
+                        # Bounce to ourselves: the server echoes it back, proving the connection works.
+                        await self.send_msgs([{"cmd": "Bounce", "slots": [self.slot]}])
+                elif self.retry_failed_connect and (self.server_task is None or self.server_task.done()) \
+                        and now - self.last_attempt > 60:
+                    self.last_attempt = now
+                    log.info(f"[{self.slot_name}] Retrying connection to {self.requested_server}")
+                    self.set_status("connecting", "")
+                    self.server_task = asyncio.create_task(server_loop(self, self.requested_server),
+                                                           name=f"server loop {self.sid}")
+            except Exception:
+                log.error(traceback.format_exc())
+
     async def stop(self):
         self.set_status("stopped", "")
         self.updater_task.cancel()
+        self.watchdog_task.cancel()
         await self.shutdown()
 
 

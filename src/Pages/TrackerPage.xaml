@@ -127,42 +127,45 @@
 
         <!-- Game tile in the switcher -->
         <DataTemplate x:Key="GameTile" DataType="{x:Type local:SlotView}">
-            <Grid Width="200">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <DockPanel>
-                    <Border Width="36" Height="48" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
-                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,2,0">
-                        <TextBlock Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
-                                   HorizontalAlignment="Right"/>
-                    </StackPanel>
-                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+            <!-- Big green number = checks in logic. Under the names: the progress bar, or the status when it needs attention. -->
+            <DockPanel Width="{Binding DataContext.TileWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left" VerticalAlignment="Center"
+                        Margin="0,0,9,0" Visibility="{Binding DataContext.TileArtVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
+                           VerticalAlignment="Center" Margin="6,0,2,0" ToolTip="Checks in logic"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
+                    <Grid Margin="0,5,0,0" Height="12">
+                        <Border x:Name="Bar" Height="3" CornerRadius="2" Background="#262626" VerticalAlignment="Center"
+                                ToolTip="{Binding CheckedText}">
+                            <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform ScaleX="{Binding Progress}"/>
+                                </Border.RenderTransform>
+                            </Border>
+                        </Border>
+                        <StackPanel x:Name="State" Orientation="Horizontal" Visibility="Collapsed" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding StatusText}" FontSize="10.5" Foreground="{StaticResource SubBrush}" Margin="5,0,0,0"
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                    </StackPanel>
-                </DockPanel>
-                <Border Grid.Row="1" Height="3" CornerRadius="2" Margin="0,8,0,0" Background="#262626">
-                    <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
-                        <Border.RenderTransform>
-                            <ScaleTransform ScaleX="{Binding Progress}"/>
-                        </Border.RenderTransform>
-                    </Border>
-                </Border>
-            </Grid>
+                    </Grid>
+                </StackPanel>
+            </DockPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsTracking}" Value="False">
+                    <Setter TargetName="Bar" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="State" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
 
     <!-- Tracker content, with the feed optionally docked on the right or along the bottom -->
     <Grid x:Name="DockRoot">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="420"/>
+            <ColumnDefinition x:Name="MainCol" Width="*" MinWidth="420"/>
             <ColumnDefinition x:Name="FeedSplitCol" Width="0"/>
             <ColumnDefinition x:Name="FeedCol" Width="0"/>
         </Grid.ColumnDefinitions>
@@ -227,7 +230,7 @@
         <DockPanel x:Name="Strip" Grid.Row="2" Margin="0,18,0,0">
             <RadioButton x:Name="AllTile" Style="{StaticResource GameTab}" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,0,0,10"
                          Checked="AllTile_Checked" ToolTip="All games (Ctrl+0)">
-                <Grid Width="96" Height="59">
+                <Grid Width="96" Height="40">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <Viewbox Width="15" Height="15" VerticalAlignment="Center">
@@ -235,8 +238,8 @@
                             </Viewbox>
                             <TextBlock Text="All games" FontSize="13" FontWeight="SemiBold" Margin="7,0,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="AllCount" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
-                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="AllCount" FontSize="18" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
+                                   HorizontalAlignment="Center" Margin="0,0,0,0"/>
                     </StackPanel>
                 </Grid>
             </RadioButton>

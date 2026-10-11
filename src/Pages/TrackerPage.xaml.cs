@@ -16,6 +16,21 @@ namespace APMultiTracker;
 
 public partial class TrackerPage : UserControl, INotifyPropertyChanged
 {
+    private double _tileWidth = 200;
+    /// <summary>Game card width: as wide as 200, narrower (down to 130) so they stay on one row when space is tight.</summary>
+    public double TileWidth
+    {
+        get => _tileWidth;
+        private set
+        {
+            if (Math.Abs(_tileWidth - value) < 0.5) return;
+            _tileWidth = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TileWidth)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TileArtVisibility)));
+        }
+    }
+    /// <summary>Narrow cards drop their small box art so the game name keeps its room.</summary>
+    public Visibility TileArtVisibility => _tileWidth < 150 ? Visibility.Collapsed : Visibility.Visible;
     private readonly ObservableCollection<CheckItem> _checks = new();
     private readonly ListCollectionView _view;
     private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(150) };
@@ -38,7 +53,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Tracker.FocusChanged += RefreshAll;
         App.Engine.Changed += () => Dispatcher.InvokeAsync(UpdateBanner);
         BoxArt.Changed += _ => { if (_shown != null) Art.SetUrl(FArt, _shown.ArtUrl); };
-        SizeChanged += (_, _) => { UpdateColumnsWidth(); UpdateCompact(); FitExplainHeight(); };
+        SizeChanged += (_, _) => { UpdateColumnsWidth(); UpdateCompact(); FitExplainHeight(); ClampFeedDock(); };
+        MainContent.SizeChanged += (_, _) => { UpdateCompact(); UpdateTileWidth(); };
+        Strip.SizeChanged += (_, _) => UpdateTileWidth();
+        App.Tracker.Slots.CollectionChanged += (_, _) => UpdateTileWidth();
         OverviewScroll.SizeChanged += (_, _) => UpdateColumnsWidth();   // also fires when All games is first shown
         IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) RefreshAll(); };
 
@@ -305,7 +323,28 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         foreach (var s in App.Tracker.Slots) s.ApplyOverviewGrouping();
     }
 
+    /// <summary>Shrink the game cards (to 130 px, art hidden below 150) before letting them wrap onto a second row.</summary>
+    private void UpdateTileWidth()
+    {
+        int n = App.Tracker.Slots.Count;
+        double avail = Strip.ActualWidth - AllTile.ActualWidth - AllTile.Margin.Right - 10;
+        if (n == 0 || avail <= 0) return;
+        const double chrome = 8 * 2 + 2 * 2 + 10;   // card padding, border and the gap after it
+        TileWidth = Math.Clamp(Math.Floor(avail / n - chrome), 130, 200);
+    }
+
     // ------------------------------------------------------------------ feed docked beside / under the tracker
+
+    /// <summary>The docked feed can't squeeze the tracker below a usable size (or push itself off-screen).</summary>
+    private void ClampFeedDock()
+    {
+        double w = DockRoot.ActualWidth, h = DockRoot.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        double mainMin = Math.Min(640, Math.Max(360, w - 16 - 300));
+        MainCol.MinWidth = mainMin;
+        FeedCol.MaxWidth = Math.Max(300, Math.Min(640, w - 16 - mainMin));
+        FeedRow.MaxHeight = Math.Max(150, h - 12 - 380);
+    }
 
     private void FeedBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -345,6 +384,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             MainContent.Margin = new Thickness(32, 26, 32, on ? 0 : 20);
         }
         DockedFeed.SetDockPosition(right ? "Right" : "Bottom");
+        ClampFeedDock();
 
         var accent = (Brush)FindResource("AccentBrush");
         var normal = (Brush)FindResource("Text2Brush");
@@ -381,9 +421,14 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FHeader.Padding = compact ? new Thickness(16, 10, 12, 4) : new Thickness(16);
         FTitle.FontSize = compact ? 18 : 22;
         ViewToggles.Margin = compact ? new Thickness(0, 40, 4, 4) : new Thickness(0, 44, 4, 6);
-        // Narrow windows: a smaller search box keeps search + filters on one line.
+        // Narrow tracker (small window or a wide docked feed): shorter labels and a smaller search box.
+        double w = MainContent.ActualWidth;
+        bool narrow = w > 0 && w < 820;
         Search.Width = double.NaN;
-        if (Search.Parent is FrameworkElement box) box.Width = ActualWidth > 0 && ActualWidth < 1000 ? 180 : 240;
+        if (Search.Parent is FrameworkElement box) box.Width = narrow ? 170 : 240;
+        GroupToggle.Content = narrow ? "Regions" : "Group by region";
+        FeedBtnText.Visibility = w > 0 && w < 700 ? Visibility.Collapsed : Visibility.Visible;
+        FArtBox.Visibility = compact || (w > 0 && w < 640) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>Keep at least a few checks visible: the explain panel never takes more than the room left over.</summary>

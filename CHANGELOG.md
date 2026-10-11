@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.6.0
+
+- **Stays up to date when left running** (engine v0.4.0): a connection that dies silently (PC asleep, Wi-Fi drop,
+  router or host dropping an idle connection) used to leave the tracker frozen on old numbers. Each slot now notices
+  when its server goes quiet, checks the connection, and reconnects by itself, then catches up. Retries are capped at
+  about a minute apart (they used to back off to hours), and a room that's down when the app starts (such as a
+  sleeping archipelago.gg room) is retried every minute until it's back.
+- **Slimmer game cards**: the big green number stays; the "x in logic" line is gone and the progress bar sits in its
+  place, so the cards are shorter. Status (Connecting, Reconnecting, Error) shows there only when it needs attention.
+- **Cards fit beside the feed**: with the feed docked, the cards narrow (down to 130 px, dropping their small art)
+  to stay on one row before wrapping.
+- **Feed dock limits**: the docked feed can't be dragged so wide (or tall) that it squeezes the tracker or pushes
+  itself off-screen. On a narrow tracker, labels shorten and the Feed button shows just its icon.
+
 ## v0.5.0
 
 - **Feed and Tracker together**: a new **Feed** button on the Tracker shows the feed right next to your checks,
