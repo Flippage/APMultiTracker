@@ -297,35 +297,33 @@
                                         <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
                                         <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold"
                                                    Foreground="{StaticResource InLogicBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                        <Border DockPanel.Dock="Right" VerticalAlignment="Center" CornerRadius="3" Padding="5,0,5,1" Margin="8,0,0,0"
+                                                ToolTip="{Binding GoModeTip}" Visibility="{Binding HasGoMode, Converter={StaticResource Vis}}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{StaticResource InLogicDimBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsGoGlitched}" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource WarnBgBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding GoModeText}" FontSize="9.5" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource InLogicBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsGoGlitched}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource GlitchedBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
                                         <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                                            <DockPanel>
-                                                <Border DockPanel.Dock="Right" VerticalAlignment="Center" CornerRadius="3" Padding="5,0,5,1" Margin="6,0,0,0"
-                                                        ToolTip="{Binding GoModeTip}" Visibility="{Binding HasGoMode, Converter={StaticResource Vis}}">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource InLogicDimBrush}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsGoGlitched}" Value="True">
-                                                                    <Setter Property="Background" Value="{StaticResource WarnBgBrush}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Text="{Binding GoModeText}" FontSize="9.5" FontWeight="Bold">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{StaticResource InLogicBrush}"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsGoGlitched}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{StaticResource GlitchedBrush}"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                </Border>
-                                                <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                            </DockPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis">
                                                 <Run Text="{Binding SlotName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CheckedText, Mode=OneWay}"/>
                                             </TextBlock>

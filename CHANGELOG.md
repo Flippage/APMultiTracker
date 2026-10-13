@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.1
+
+- The **GO MODE** pill on an All games column now sits next to the in-logic number, lined up with it, instead of
+  beside the game's name.
+
 ## v0.8.0
 
 - **GO MODE badge**: like Universal Tracker's "Go mode", a game whose goal can be reached with what's in logic now
