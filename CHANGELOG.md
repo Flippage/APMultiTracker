@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.0
+
+- **BK**: when a game has nothing in logic, its number shows a red **BK** instead of 0 (Archipelago slang for being
+  stuck with no checks to do), on the game card, its All games column, the focused view and the sidebar. A game
+  with every check done still shows 0.
+- The in-logic number on game cards and All games columns is now centred on the box art (it sat about 2 px low).
+
 ## v0.8.1
 
 - The **GO MODE** pill on an All games column now sits next to the in-logic number, lined up with it, instead of

@@ -152,7 +152,11 @@ public sealed class SlotView : INotifyPropertyChanged
     public double Progress => Total > 0 ? (double)Checked / Total : 0;
     public string CheckedText => Total > 0 ? $"{Checked}/{Total}" : "–";
     public string PercentText => Total > 0 ? $"{Progress * 100:0}%" : "";
-    public string InLogicText => HasData ? InLogic.ToString() : "–";
+    /// <summary>"BK": nothing in logic right now (Archipelago slang for being stuck), unless every check is done.</summary>
+    public bool IsBK => HasData && InLogic == 0 && !IsDone;
+    public string InLogicText => IsBK ? "BK" : HasData ? InLogic.ToString() : "–";
+    public Brush InLogicBrush => IsBK ? Brushes2.Danger : Brushes2.InLogic;
+    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : "Checks in logic";
     public bool IsDone => HasData && Total > 0 && Checked >= Total;
     public bool IsGoMode => GoMode == "yes";
     /// <summary>The goal can be reached now (in logic, or with glitches): like UT's "Go mode" header.</summary>

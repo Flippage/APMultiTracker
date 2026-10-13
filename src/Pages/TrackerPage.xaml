@@ -131,8 +131,9 @@
             <DockPanel Width="{Binding DataContext.TileWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
                 <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left" VerticalAlignment="Center"
                         Margin="0,0,9,0" Visibility="{Binding DataContext.TileArtVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
-                <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"
-                           VerticalAlignment="Center" Margin="6,0,2,0" ToolTip="Checks in logic"/>
+                <!-- Bottom margin: the digits sit low in their line box, this centres them on the art -->
+                <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
+                           VerticalAlignment="Center" Margin="6,0,2,4" ToolTip="{Binding InLogicTip}"/>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
@@ -296,7 +297,8 @@
                                     <DockPanel Margin="0,0,6,10">
                                         <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
                                         <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold"
-                                                   Foreground="{StaticResource InLogicBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                   Foreground="{Binding InLogicBrush}" VerticalAlignment="Center" Margin="8,0,0,4"
+                                                   ToolTip="{Binding InLogicTip}"/>
                                         <Border DockPanel.Dock="Right" VerticalAlignment="Center" CornerRadius="3" Padding="5,0,5,1" Margin="8,0,0,0"
                                                 ToolTip="{Binding GoModeTip}" Visibility="{Binding HasGoMode, Converter={StaticResource Vis}}">
                                             <Border.Style>
@@ -415,9 +417,9 @@
                         <TextBlock x:Name="FTitle" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="FSub" FontSize="13" Foreground="{StaticResource SubBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                         <WrapPanel Margin="0,12,0,0">
-                            <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}">
-                                <TextBlock FontSize="12.5" Foreground="{StaticResource InLogicBrush}">
-                                    <Run x:Name="FInLogic" FontWeight="Bold" FontSize="14"/><Run Text=" in logic"/>
+                            <Border x:Name="FInLogicChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}">
+                                <TextBlock x:Name="FInLogicText" FontSize="12.5" Foreground="{StaticResource InLogicBrush}">
+                                    <Run x:Name="FInLogic" FontWeight="Bold" FontSize="14"/><Run x:Name="FInLogicLabel" Text=" in logic"/>
                                 </TextBlock>
                             </Border>
                             <Border x:Name="FGlitchedChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource WarnBgBrush}">

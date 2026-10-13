@@ -71,6 +71,8 @@ public static class Demo
             {
                 string status = n < g.Checks.Length * 0.6 ? "in_logic" : n % 3 == 0 ? "glitched" : "out_of_logic";
                 if (g.Game == "Timespinner" && n < 2) status = "in_logic";
+                // Check shot: Stardew Valley in BK (nothing in logic)
+                if (g.Id == "d3" && status == "in_logic" && Environment.GetEnvironmentVariable("APMT_SHOT_BK") == "1") status = "out_of_logic";
                 string? hint = n == 2 ? "Mantis Claw → FlippLink" : n == 5 && g.Id == "d2" ? "Progressive Hookshot" : null;
                 locs.Add(new JsonObject
                 {

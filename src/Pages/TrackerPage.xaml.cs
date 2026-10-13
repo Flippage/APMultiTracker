@@ -173,7 +173,11 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FTitle.Text = s.Title;
         FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "");
         Art.SetUrl(FArt, s.ArtUrl);
-        FInLogic.Text = s.HasData ? s.InLogic.ToString() : "–";
+        FInLogic.Text = s.InLogicText;
+        FInLogicLabel.Text = s.IsBK ? "" : " in logic";
+        FInLogicText.Foreground = s.InLogicBrush;
+        FInLogicChip.Background = (Brush)FindResource(s.IsBK ? "DangerBgBrush" : "InLogicDimBrush");
+        FInLogicChip.ToolTip = s.IsBK ? s.InLogicTip : null;
         FGlitched.Text = s.Glitched.ToString();
         FGlitchedChip.Visibility = s.Glitched > 0 ? Visibility.Visible : Visibility.Collapsed;
         FHinted.Text = s.Hinted.ToString();

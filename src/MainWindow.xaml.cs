@@ -181,8 +181,9 @@ public partial class MainWindow : Window
             Art.SetUrl(FocusArt, f.ArtUrl);
             FocusCollage.Visibility = Visibility.Collapsed;
             FocusArtIdle.Visibility = string.IsNullOrEmpty(f.ArtUrl) ? Visibility.Visible : Visibility.Collapsed;
-            FocusCount.Text = f.HasData ? f.InLogic.ToString() : "–";
-            FocusCountLabel.Text = " in logic";
+            FocusCount.Text = f.InLogicText;
+            FocusCount.Foreground = f.InLogicBrush;
+            FocusCountLabel.Text = f.IsBK ? "" : " in logic";
             FocusBarScale.ScaleX = f.Progress;
             FocusChecked.Text = f.HasData ? $"{f.Checked} / {f.Total} checked · {f.PercentText}" : f.StatusDetail;
             GoTag.Visibility = f.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
@@ -203,6 +204,7 @@ public partial class MainWindow : Window
             FocusArtIdle.Visibility = BuildCollage(store.Slots) ? Visibility.Collapsed : Visibility.Visible;
             bool any = store.Slots.Any(s => s.HasData);
             FocusCount.Text = any ? store.Slots.Sum(s => s.InLogic).ToString() : "–";
+            FocusCount.Foreground = Brushes2.InLogic;
             FocusCountLabel.Text = " in logic";
             int chk = store.Slots.Sum(s => s.Checked), tot = store.Slots.Sum(s => s.Total);
             FocusBarScale.ScaleX = tot > 0 ? (double)chk / tot : 0;
