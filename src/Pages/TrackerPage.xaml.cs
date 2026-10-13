@@ -180,8 +180,11 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FHintedChip.Visibility = s.Hinted > 0 ? Visibility.Visible : Visibility.Collapsed;
         FChecked.Text = s.HasData ? $"{s.Checked}/{s.Total}" : "–";
         FBar.ScaleX = s.Progress;
-        FGoChip.Visibility = s.GoMode == "no" ? Visibility.Collapsed : Visibility.Visible;
+        FGoChip.Visibility = s.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
         FGo.Text = s.GoModeText;
+        FGoChip.ToolTip = s.GoModeTip;
+        FGoChip.Background = (Brush)FindResource(s.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
+        FGoChip.BorderBrush = FGo.Foreground = (Brush)FindResource(s.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
         FHiddenPill.Content = s.Hidden > 0 ? $"Hidden ({s.Hidden})" : "Hidden";
         FHintPill.Content = s.Hinted > 0 ? $"Hinted ({s.Hinted})" : "Hinted";
 

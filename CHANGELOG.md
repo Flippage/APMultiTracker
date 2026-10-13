@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.0
+
+- **GO MODE badge**: like Universal Tracker's "Go mode", a game whose goal can be reached with what's in logic now
+  shows **GO MODE** on its game card, its All games column and the focused view (yellow, "GO MODE (GLITCHED)", if
+  it needs glitches). Nothing is shown until then. The feed also notes when one of your games goes into go mode.
+
 ## v0.7.0
 
 - **Follows archipelago.gg rooms to their new port**: a multiworld now has a **Room link** field (the room's page,

@@ -155,7 +155,12 @@ public sealed class SlotView : INotifyPropertyChanged
     public string InLogicText => HasData ? InLogic.ToString() : "–";
     public bool IsDone => HasData && Total > 0 && Checked >= Total;
     public bool IsGoMode => GoMode == "yes";
-    public string GoModeText => GoMode switch { "yes" => "GO MODE", "glitched" => "GO (GLITCHED)", _ => "" };
+    /// <summary>The goal can be reached now (in logic, or with glitches): like UT's "Go mode" header.</summary>
+    public bool HasGoMode => HasData && GoMode is "yes" or "glitched";
+    public bool IsGoGlitched => GoMode == "glitched";
+    public string GoModeText => GoMode switch { "yes" => "GO MODE", "glitched" => "GO MODE (GLITCHED)", _ => "" };
+    public string GoModeTip => GoMode == "glitched" ? "Your goal can be reached, but only with glitches"
+                                                     : "Everything needed to finish this game is in logic";
 
     public string StatusText => Status switch
     {
@@ -500,7 +505,22 @@ public sealed class TrackerStore
                 _ = _engine.Client.UntrackAsync(stale);
             return;
         }
-        if (type == "slot") slot.ApplySnapshot(m);
+        if (type == "slot")
+        {
+            // Say so in the feed when a game goes into go mode (not when it already was at startup).
+            bool hadData = slot.HasData, wasGo = slot.GoMode == "yes";
+            slot.ApplySnapshot(m);
+            if (hadData && !wasGo && slot.GoMode == "yes" && _live.Values.FirstOrDefault(l => l.Slots.Contains(slot)) is { } live)
+                AddFeed(live.World.Id, new JsonObject
+                {
+                    ["kind"] = "Text",
+                    ["time"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
+                    ["segments"] = new JsonArray(
+                        new JsonObject { ["text"] = "GO MODE", ["color"] = "green" },
+                        new JsonObject { ["text"] = $": {slot.SlotName} ({slot.Title}) can finish their game." }),
+                    ["players"] = new JsonArray(),
+                });
+        }
         else if (type == "status") slot.ApplyStatus(m);
         else if (type == "removed") slot.Reset();
         else return;

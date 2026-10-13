@@ -35,6 +35,7 @@ in one place, with a faster, cleaner interface.
 | 🎯 **Focus one game** | Big check list with search, filters (In logic, + Glitched, All remaining, Hinted, Hidden), collapsible region groups and received items. |
 | ⌨️ **Fast switching** | Click a game tile, or Ctrl+1…9, Ctrl+0 for all games, Ctrl+Tab to step through. |
 | 🔎 **Explain & logical path** | Why is something in or out of logic? UT's `/explain` and `/get_logical_path`, one double-click away. |
+| 🏁 **Go mode** | A **GO MODE** badge on a game as soon as everything needed to finish it is in logic (like UT's Go mode), with a line in the feed when it happens. Shown in yellow if it needs glitches. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |

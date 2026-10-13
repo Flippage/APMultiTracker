@@ -185,8 +185,10 @@ public partial class MainWindow : Window
             FocusCountLabel.Text = " in logic";
             FocusBarScale.ScaleX = f.Progress;
             FocusChecked.Text = f.HasData ? $"{f.Checked} / {f.Total} checked · {f.PercentText}" : f.StatusDetail;
-            GoTag.Visibility = f.GoMode == "no" ? Visibility.Collapsed : Visibility.Visible;
-            GoText.Text = f.GoModeText;
+            GoTag.Visibility = f.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
+            GoText.Text = f.IsGoGlitched ? "GO (GLITCHED)" : "GO MODE";
+            GoTag.Background = (Brush)FindResource(f.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
+            GoText.Foreground = (Brush)FindResource(f.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
             f.PropertyChanged -= Focused_PropertyChanged;
             f.PropertyChanged += Focused_PropertyChanged;
         }
