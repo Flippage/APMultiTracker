@@ -109,6 +109,15 @@
                             <TextBlock x:Name="AutoInstallSub" Style="{StaticResource Sub}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </DockPanel>
+                    <Rectangle Height="1" Fill="#1F1F1F"/>
+                    <DockPanel Margin="20,14">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Content="Patch notes" Height="38"
+                                Margin="16,0,0,0" VerticalAlignment="Center" Click="PatchNotes_Click"/>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Patch notes" Style="{StaticResource ItemTitle}"/>
+                            <TextBlock Text="What changed in this version and every one before it." Style="{StaticResource Sub}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
                 </StackPanel>
             </Border>
             <TextBlock x:Name="UpdFooter" Style="{StaticResource Sub}" FontSize="11.5" Foreground="#7A7A7A" Margin="4,8,0,0"/>

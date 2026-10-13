@@ -115,6 +115,12 @@ public sealed class SlotView : INotifyPropertyChanged
     public int Hinted { get; private set; }
     public int Hidden { get; private set; }
     public string GoMode { get; private set; } = "no";
+    /// <summary>The slot has reported its goal as complete (client status GOAL).</summary>
+    public bool Goal { get; private set; }
+    public bool ShowCount => !Goal;
+    /// <summary>The room auto-releases on goal, so a goaled slot's remaining checks have been sent out.</summary>
+    public bool AutoRelease { get; private set; }
+    public bool Released => Goal && AutoRelease;
     public IReadOnlyList<CheckItem> Locations { get; private set; } = Array.Empty<CheckItem>();
     public IReadOnlyList<ItemCount> Items { get; private set; } = Array.Empty<ItemCount>();
     public IReadOnlyList<string> Errors { get; private set; } = Array.Empty<string>();
@@ -152,23 +158,27 @@ public sealed class SlotView : INotifyPropertyChanged
     public double Progress => Total > 0 ? (double)Checked / Total : 0;
     public string CheckedText => Total > 0 ? $"{Checked}/{Total}" : "–";
     public string PercentText => Total > 0 ? $"{Progress * 100:0}%" : "";
-    /// <summary>"BK": nothing in logic right now (Archipelago slang for being stuck), unless every check is done.</summary>
-    public bool IsBK => HasData && InLogic == 0 && !IsDone;
+    /// <summary>"BK": nothing in logic and the goal isn't reachable either (so not goaled and not in go mode).</summary>
+    public bool IsBK => HasData && InLogic == 0 && !Goal && GoMode != "yes";
     public string InLogicText => IsBK ? "BK" : HasData ? InLogic.ToString() : "–";
     public Brush InLogicBrush => IsBK ? Brushes2.Danger : Brushes2.InLogic;
-    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : "Checks in logic";
+    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete" : "Checks in logic";
     public bool IsDone => HasData && Total > 0 && Checked >= Total;
     public bool IsGoMode => GoMode == "yes";
-    /// <summary>The goal can be reached now (in logic, or with glitches): like UT's "Go mode" header.</summary>
-    public bool HasGoMode => HasData && GoMode is "yes" or "glitched";
-    public bool IsGoGlitched => GoMode == "glitched";
-    public string GoModeText => GoMode switch { "yes" => "GO MODE", "glitched" => "GO MODE (GLITCHED)", _ => "" };
-    public string GoModeTip => GoMode == "glitched" ? "Your goal can be reached, but only with glitches"
-                                                     : "Everything needed to finish this game is in logic";
+    /// <summary>Show the go mode pill: the goal can be reached now (in logic, or with glitches), like UT's "Go mode"
+    /// header. Once the goal is done the same pill says GOALED.</summary>
+    public bool HasGoMode => HasData && (Goal || GoMode is "yes" or "glitched");
+    public bool IsGoGlitched => !Goal && GoMode == "glitched";
+    public string GoModeText => Goal ? "GOALED" : GoMode switch { "yes" => "GO MODE", "glitched" => "GO MODE (GLITCHED)", _ => "" };
+    public string GoModeShort => Goal ? "GOALED" : "GO MODE";
+    public string GoModeTip => Released ? "Goal complete. This room releases on goal, so the remaining checks were sent out"
+                             : Goal ? "Goal complete. This room doesn't release on goal: the remaining checks stay until the host releases them"
+                             : GoMode == "glitched" ? "Your goal can be reached, but only with glitches"
+                             : "Everything needed to finish this game is in logic";
 
     public string StatusText => Status switch
     {
-        "tracking" => IsDone ? "All checks done" : $"{InLogic} in logic",
+        "tracking" => Released ? "Goaled" : IsDone ? "All checks done" : $"{InLogic} in logic",
         "connecting" => "Connecting…",
         "generating" => "Building logic…",
         "reconnecting" => "Reconnecting…",
@@ -216,6 +226,8 @@ public sealed class SlotView : INotifyPropertyChanged
         Hinted = (int)Json.Long(m["hinted"]);
         Hidden = (int)Json.Long(m["ignored"]);
         GoMode = m["go_mode"]?.GetValue<string>() ?? "no";
+        Goal = m["goal"]?.GetValue<bool>() ?? false;
+        AutoRelease = m["auto_release"]?.GetValue<bool>() ?? false;
         Warning = m["warning"]?.GetValue<string>() ?? "";
 
         var locs = new List<CheckItem>();
@@ -232,6 +244,13 @@ public sealed class SlotView : INotifyPropertyChanged
                     o["hint"]?.GetValue<string>(),
                     o["key"]?.GetValue<string>()));
             }
+        if (Released)
+        {
+            // Goaled in a room that auto-releases: whatever is left was sent to the other games.
+            locs.Clear();
+            Checked = Total;
+            InLogic = Glitched = Hinted = Hidden = 0;
+        }
         Locations = locs;
 
         var items = new List<ItemCount>();

@@ -1,10 +1,22 @@
 # Changelog
 
+## v0.9.1
+
+- **Patch notes in the app**: Settings → Updates → **Patch notes** shows what changed in every version. The current
+  version is open; older ones are collapsed under their version number and open with a click.
+- **Goal complete** (engine v0.4.1): once a game's goal is done, its number turns into a green tick, a **GOALED** pill
+  replaces GO MODE and its progress bars turn green. If the room releases on goal (auto release), the bar fills up
+  and the game's checks are cleared, since they've been sent out. If it doesn't, the remaining checks stay listed
+  until the host releases them.
+- **BK** now only shows when a game is really stuck: a game in go mode or with its goal done never shows BK, even
+  with nothing left in logic.
+- **Game cards**: the progress bar runs the full width along the bottom edge of the card, so cards are a line
+  shorter. Connecting / Reconnecting / Error show in place of the slot name.
+
 ## v0.9.0
 
-- **BK**: when a game has nothing in logic, its number shows a red **BK** instead of 0 (Archipelago slang for being
-  stuck with no checks to do), on the game card, its All games column, the focused view and the sidebar. A game
-  with every check done still shows 0.
+- **BK**: when a game has nothing in logic, its number shows a red **BK** instead of 0, on the game card, its All
+  games column, the focused view and the sidebar.
 - The in-logic number on game cards and All games columns is now centred on the box art (it sat about 2 px low).
 
 ## v0.8.1

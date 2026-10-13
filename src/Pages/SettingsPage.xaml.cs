@@ -277,6 +277,8 @@ public partial class SettingsPage : UserControl
     private async void UpdCheck_Click(object sender, RoutedEventArgs e) => await App.Updater.CheckAsync(manual: true);
     private void UpdNotes_Click(object sender, RoutedEventArgs e) => App.Updater.OpenReleaseNotes();
 
+    private void PatchNotes_Click(object sender, RoutedEventArgs e) => ((MainWindow)Window.GetWindow(this)).OpenPatchNotes();
+
     // ------------------------------------------------------------ twitch
 
     private void UpdateAccount()

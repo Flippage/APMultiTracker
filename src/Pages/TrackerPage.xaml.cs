@@ -184,6 +184,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FHintedChip.Visibility = s.Hinted > 0 ? Visibility.Visible : Visibility.Collapsed;
         FChecked.Text = s.HasData ? $"{s.Checked}/{s.Total}" : "–";
         FBar.ScaleX = s.Progress;
+        FBarFill.Background = s.Goal ? Brushes2.InLogic : Brushes2.Accent;
+        FInLogicChip.Visibility = s.Released ? Visibility.Collapsed : Visibility.Visible;   // nothing left to do
         FGoChip.Visibility = s.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
         FGo.Text = s.GoModeText;
         FGoChip.ToolTip = s.GoModeTip;
@@ -243,6 +245,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         {
             (ListEmptyTitle.Text, ListEmptySub.Text) =
                 q.Length > 0 ? ("No matches", "Nothing matches your search.")
+                : s.Released ? ("Goaled!", "This room releases on goal, so the remaining checks were sent to the other players.")
                 : s.IsDone ? ("Every check is done!", "This game has nothing left.")
                 : filter switch
                 {

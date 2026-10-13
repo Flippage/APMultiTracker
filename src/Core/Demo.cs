@@ -99,7 +99,8 @@ public static class Demo
                 ["checked"] = g.Checked, ["total"] = g.Total, ["in_logic"] = inLogic,
                 ["glitched"] = locs.Count(l => l!["status"]!.GetValue<string>() == "glitched"),
                 ["hinted"] = locs.Count(l => l!["hint"] != null), ["ignored"] = 1,
-                ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["locations"] = locs, ["items"] = items,
+                ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
+                ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
             });
         }
@@ -203,6 +204,9 @@ public static class Demo
         w.CloseMultiworldEditor();
         w.GoToSettings();
         await Shot("settings");
+        w.OpenPatchNotes();
+        await Shot("patch-notes");
+        w.ClosePatchNotes();
         if (Environment.GetEnvironmentVariable("APMT_SHOT_FEED") == "1")
         {
             // Checks the docked feed's limits at a typical window size (not used for the README).

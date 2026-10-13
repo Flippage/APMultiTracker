@@ -99,6 +99,14 @@ public partial class MainWindow : Window
         Host.Content = new EditMultiworldPage(world);
     }
 
+    public void OpenPatchNotes()
+    {
+        NavSettings.IsChecked = true;
+        Host.Content = new PatchNotesPage();
+    }
+
+    public void ClosePatchNotes() => Host.Content = _settings;
+
     public void CloseMultiworldEditor()
     {
         _multiworlds.Refresh();
@@ -181,12 +189,13 @@ public partial class MainWindow : Window
             Art.SetUrl(FocusArt, f.ArtUrl);
             FocusCollage.Visibility = Visibility.Collapsed;
             FocusArtIdle.Visibility = string.IsNullOrEmpty(f.ArtUrl) ? Visibility.Visible : Visibility.Collapsed;
-            FocusCount.Text = f.InLogicText;
+            FocusCount.Text = f.Goal ? "GOALED" : f.InLogicText;
             FocusCount.Foreground = f.InLogicBrush;
-            FocusCountLabel.Text = f.IsBK ? "" : " in logic";
+            FocusCountLabel.Text = f.IsBK || f.Goal ? "" : " in logic";
             FocusBarScale.ScaleX = f.Progress;
+            FocusBar.Background = f.Goal ? Brushes2.InLogic : Brushes2.Accent;
             FocusChecked.Text = f.HasData ? $"{f.Checked} / {f.Total} checked · {f.PercentText}" : f.StatusDetail;
-            GoTag.Visibility = f.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
+            GoTag.Visibility = f.HasGoMode && !f.Goal ? Visibility.Visible : Visibility.Collapsed;
             GoText.Text = f.IsGoGlitched ? "GO (GLITCHED)" : "GO MODE";
             GoTag.Background = (Brush)FindResource(f.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
             GoText.Foreground = (Brush)FindResource(f.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
@@ -208,6 +217,7 @@ public partial class MainWindow : Window
             FocusCountLabel.Text = " in logic";
             int chk = store.Slots.Sum(s => s.Checked), tot = store.Slots.Sum(s => s.Total);
             FocusBarScale.ScaleX = tot > 0 ? (double)chk / tot : 0;
+            FocusBar.Background = Brushes2.Accent;
             FocusChecked.Text = tot > 0 ? $"{chk} / {tot} checked · {(double)chk / tot * 100:0}%" : "";
             GoTag.Visibility = Visibility.Collapsed;
         }

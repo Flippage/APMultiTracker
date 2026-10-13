@@ -179,17 +179,18 @@ class SlotContext(CommonContext):
                 self.room_seed = args.get("seed_name", "")
             elif cmd == "Connected":
                 self.slot_data = args.get("slot_data") or {}
+                self.set_notify(self._status_key)   # goal reached? (resent on every reconnect by CommonContext)
                 self.engine.spawn(self._initialize(), f"init {self.sid}")
             elif cmd in ("RoomUpdate", "ReceivedItems", "LocationInfo"):
                 self.watcher_event.set()
             elif cmd == "Retrieved":
                 keys = args.get("keys", {})
-                if self._hint_key in keys:
+                if self._hint_key in keys or self._status_key in keys:
                     self.watcher_event.set()
                 self._deferred_changed([k for k in self.deferred_keys if k in keys])
             elif cmd == "SetReply":
                 key = args.get("key", "")
-                if key == self._hint_key:
+                if key in (self._hint_key, self._status_key):
                     self.watcher_event.set()
                 self._deferred_changed([key] if key in self.deferred_keys else [])
         except Exception as e:
@@ -199,6 +200,10 @@ class SlotContext(CommonContext):
     @property
     def _hint_key(self) -> str:
         return f"_read_hints_{self.team}_{self.slot}"
+
+    @property
+    def _status_key(self) -> str:
+        return f"_read_client_status_{self.team}_{self.slot}"
 
     # ---- status
 
@@ -360,6 +365,9 @@ class SlotContext(CommonContext):
             "hint_text": {loc: self._hint_text(h) for loc, h in hints.items()},
             "game": self.slot_info[self.slot].game,
             "server_locations": set(self.server_locations),
+            "goal": self.stored_data.get(self._status_key) == 30,   # ClientStatus.CLIENT_GOAL
+            # The room releases a slot's remaining items when it goals ("auto" / "auto_enabled" release mode)
+            "auto_release": "auto" in str(self.permissions.get("release", "")),
         }
         return inputs
 
@@ -438,6 +446,8 @@ class SlotContext(CommonContext):
             "hinted": sum(1 for loc in locations if loc["hint"] and loc["status"] != "ignored"),
             "ignored": len(core.ignored_locations & inputs["missing"]),
             "go_mode": go_mode,
+            "goal": inputs["goal"],
+            "auto_release": inputs["auto_release"],
             "locations": locations,
             "items": items,
             "errors": errors,

@@ -127,51 +127,69 @@
 
         <!-- Game tile in the switcher -->
         <DataTemplate x:Key="GameTile" DataType="{x:Type local:SlotView}">
-            <!-- Big green number = checks in logic. Under the names: the progress bar, or the status when it needs attention. -->
-            <DockPanel Width="{Binding DataContext.TileWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
-                <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left" VerticalAlignment="Center"
-                        Margin="0,0,9,0" Visibility="{Binding DataContext.TileArtVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
-                <!-- Bottom margin: the digits sit low in their line box, this centres them on the art -->
-                <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
-                           VerticalAlignment="Center" Margin="6,0,2,4" ToolTip="{Binding InLogicTip}"/>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
-                    <Grid Margin="0,5,0,0" Height="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border x:Name="Go" CornerRadius="3" Padding="4,0,4,1" Margin="0,0,6,0" VerticalAlignment="Center"
-                                Background="{StaticResource InLogicDimBrush}" ToolTip="{Binding GoModeTip}"
-                                Visibility="{Binding HasGoMode, Converter={StaticResource Vis}}">
-                            <TextBlock x:Name="GoLabel" Text="GO MODE" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
-                        </Border>
-                        <Border x:Name="Bar" Grid.Column="1" Height="3" CornerRadius="2" Background="#262626" VerticalAlignment="Center"
-                                ToolTip="{Binding CheckedText}">
-                            <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
-                                <Border.RenderTransform>
-                                    <ScaleTransform ScaleX="{Binding Progress}"/>
-                                </Border.RenderTransform>
-                            </Border>
-                        </Border>
-                        <StackPanel x:Name="State" Grid.ColumnSpan="2" Orientation="Horizontal" Visibility="Collapsed" VerticalAlignment="Center">
-                            <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding StatusText}" FontSize="10.5" Foreground="{StaticResource SubBrush}" Margin="5,0,0,0"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
+            <!-- Big number = checks in logic (red BK when stuck, a tick once the goal is done).
+                 Progress runs along the card's bottom edge. -->
+            <Grid Width="{Binding DataContext.TileWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <DockPanel Margin="0,0,0,3">
+                    <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left" VerticalAlignment="Center"
+                            Margin="0,0,9,0" Visibility="{Binding DataContext.TileArtVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                    <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,2,0" ToolTip="{Binding InLogicTip}">
+                        <!-- Bottom margin: the digits sit low in their line box, this centres them on the art -->
+                        <TextBlock x:Name="Count" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
+                                   Margin="0,0,0,4" HorizontalAlignment="Right"/>
+                        <Viewbox x:Name="GoalMark" Width="20" Height="20" Visibility="Collapsed">
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconCheck}" Stroke="{StaticResource InLogicBrush}" StrokeThickness="3.4"/>
+                        </Viewbox>
                     </Grid>
-                </StackPanel>
-            </DockPanel>
+                    <!-- Beside the number, centred with it and the art -->
+                    <Border x:Name="Go" DockPanel.Dock="Right" CornerRadius="3" Padding="4,0,4,1" Margin="6,0,0,0" VerticalAlignment="Center"
+                            Background="{StaticResource InLogicDimBrush}" ToolTip="{Binding GoModeTip}" Visibility="Collapsed">
+                        <TextBlock x:Name="GoLabel" Text="{Binding GoModeShort}" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <Grid>
+                            <DockPanel x:Name="SlotLine">
+                                <TextBlock Text="{Binding SlotName}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"/>
+                            </DockPanel>
+                            <!-- Instead of the slot name while it needs attention (Connecting, Reconnecting, Error) -->
+                            <StackPanel x:Name="State" Orientation="Horizontal" Visibility="Collapsed">
+                                <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource SubBrush}" Margin="5,0,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </DockPanel>
+                <!-- Covers the whole card (its padding is 8) and is clipped to its inner corners -->
+                <Grid Margin="-8" IsHitTestVisible="False" local:RoundClip.Radius="10">
+                    <Border x:Name="Bar" Height="3" VerticalAlignment="Bottom" Background="#262626">
+                        <Border x:Name="Fill" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="{Binding Progress}"/>
+                            </Border.RenderTransform>
+                        </Border>
+                    </Border>
+                </Grid>
+            </Grid>
             <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding IsTracking}" Value="False">
-                    <Setter TargetName="Bar" Property="Visibility" Value="Collapsed"/>
-                    <Setter TargetName="Go" Property="Visibility" Value="Collapsed"/>
-                    <Setter TargetName="State" Property="Visibility" Value="Visible"/>
+                <DataTrigger Binding="{Binding HasGoMode}" Value="True">
+                    <Setter TargetName="Go" Property="Visibility" Value="Visible"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsGoGlitched}" Value="True">
                     <Setter TargetName="Go" Property="Background" Value="{StaticResource WarnBgBrush}"/>
                     <Setter TargetName="GoLabel" Property="Foreground" Value="{StaticResource GlitchedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Goal}" Value="True">
+                    <Setter TargetName="Count" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="GoalMark" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="Fill" Property="Background" Value="{StaticResource InLogicBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsTracking}" Value="False">
+                    <Setter TargetName="Bar" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="SlotLine" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="Go" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="State" Property="Visibility" Value="Visible"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -296,9 +314,14 @@
                                         ToolTip="Focus this game">
                                     <DockPanel Margin="0,0,6,10">
                                         <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold"
-                                                   Foreground="{Binding InLogicBrush}" VerticalAlignment="Center" Margin="8,0,0,4"
-                                                   ToolTip="{Binding InLogicTip}"/>
+                                        <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip="{Binding InLogicTip}">
+                                            <TextBlock Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
+                                                       Margin="0,0,0,4" Visibility="{Binding ShowCount, Converter={StaticResource Vis}}"/>
+                                            <Viewbox Width="21" Height="21" Visibility="{Binding Goal, Converter={StaticResource Vis}}">
+                                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconCheck}" Stroke="{StaticResource InLogicBrush}"
+                                                      StrokeThickness="3.4"/>
+                                            </Viewbox>
+                                        </Grid>
                                         <Border DockPanel.Dock="Right" VerticalAlignment="Center" CornerRadius="3" Padding="5,0,5,1" Margin="8,0,0,0"
                                                 ToolTip="{Binding GoModeTip}" Visibility="{Binding HasGoMode, Converter={StaticResource Vis}}">
                                             <Border.Style>
@@ -438,7 +461,7 @@
                                         <Run x:Name="FChecked" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextBrush}"/><Run Text=" checked"/>
                                     </TextBlock>
                                     <Border Width="70" Height="4" CornerRadius="2" Background="#333333" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <Border CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                                        <Border x:Name="FBarFill" CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
                                             <Border.RenderTransform>
                                                 <ScaleTransform x:Name="FBar" ScaleX="0"/>
                                             </Border.RenderTransform>

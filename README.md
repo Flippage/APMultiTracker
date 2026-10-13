@@ -37,6 +37,7 @@ in one place, with a faster, cleaner interface.
 | 🔎 **Explain & logical path** | Why is something in or out of logic? UT's `/explain` and `/get_logical_path`, one double-click away. |
 | 🍔 **BK** | A game with nothing in logic shows a red **BK** instead of 0, so you can see at a glance who's stuck. |
 | 🏁 **Go mode** | A **GO MODE** badge on a game as soon as everything needed to finish it is in logic (like UT's Go mode), with a line in the feed when it happens. Shown in yellow if it needs glitches. |
+| ✅ **Goaled** | A finished game gets a green tick and a **GOALED** pill. If the room releases on goal, its checks are cleared and its bar fills up. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |
@@ -44,6 +45,7 @@ in one place, with a faster, cleaner interface.
 | 🌍 **Several multiworlds at once** | Save rooms with their server and slots (**Find slots in this room** lists everyone). Keep several connected and switch between them instantly. |
 | ⚙️ **Zero fuss engine** | One click installs the engine into Archipelago; the app starts and stops it for you. |
 | ⬆️ **Auto-updates** | Checks GitHub for new versions, downloads in the background and installs in one click. |
+| 📝 **Patch notes** | Every version's changes, right in the app (Settings → Updates → Patch notes). |
 
 <p align="center">
   <img src="docs/screenshots/focused.png" alt="One game focused" width="900">
