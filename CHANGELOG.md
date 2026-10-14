@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.2
+
+- **Completion %**: the focused game's header shows how much of the game is checked, to two decimal places like
+  the room page on archipelago.gg (e.g. **55.27%**), in a blue chip next to the checked count.
+
 ## v0.9.1
 
 - **Patch notes in the app**: Settings → Updates → **Patch notes** shows what changed in every version. The current

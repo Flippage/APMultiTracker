@@ -32,7 +32,7 @@ in one place, with a faster, cleaner interface.
 | | |
 |---|---|
 | 🧭 **All games at once** | Every slot's in-logic checks side by side, with live counts, optionally grouped by region. |
-| 🎯 **Focus one game** | Big check list with search, filters (In logic, + Glitched, All remaining, Hinted, Hidden), collapsible region groups and received items. |
+| 🎯 **Focus one game** | Big check list with search, filters (In logic, + Glitched, All remaining, Hinted, Hidden), collapsible region groups, received items and the completion % to two decimals (like the room page). |
 | ⌨️ **Fast switching** | Click a game tile, or Ctrl+1…9, Ctrl+0 for all games, Ctrl+Tab to step through. |
 | 🔎 **Explain & logical path** | Why is something in or out of logic? UT's `/explain` and `/get_logical_path`, one double-click away. |
 | 🍔 **BK** | A game with nothing in logic shows a red **BK** instead of 0, so you can see at a glance who's stuck. |

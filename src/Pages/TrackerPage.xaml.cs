@@ -183,6 +183,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FHinted.Text = s.Hinted.ToString();
         FHintedChip.Visibility = s.Hinted > 0 ? Visibility.Visible : Visibility.Collapsed;
         FChecked.Text = s.HasData ? $"{s.Checked}/{s.Total}" : "–";
+        FPercentChip.Visibility = s.HasData && s.Total > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FPercent.Text = (s.Progress * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
         FBar.ScaleX = s.Progress;
         FBarFill.Background = s.Goal ? Brushes2.InLogic : Brushes2.Accent;
         FInLogicChip.Visibility = s.Released ? Visibility.Collapsed : Visibility.Visible;   // nothing left to do

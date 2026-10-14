@@ -469,6 +469,13 @@
                                     </Border>
                                 </StackPanel>
                             </Border>
+                            <!-- Completion to two decimals, like the room page on archipelago.gg -->
+                            <Border x:Name="FPercentChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource AccentDimBrush}"
+                                    ToolTip="Checks done">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource AccentBrush}">
+                                    <Run x:Name="FPercent" FontWeight="Bold" FontSize="14"/>
+                                </TextBlock>
+                            </Border>
                             <Border x:Name="FGoChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}"
                                     BorderBrush="{StaticResource InLogicBrush}" BorderThickness="1">
                                 <TextBlock x:Name="FGo" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
