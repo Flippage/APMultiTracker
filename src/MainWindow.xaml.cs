@@ -212,7 +212,7 @@ public partial class MainWindow : Window
             FocusArt.Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x1F, 0x1F));
             FocusArtIdle.Visibility = BuildCollage(store.Slots) ? Visibility.Collapsed : Visibility.Visible;
             bool any = store.Slots.Any(s => s.HasData);
-            FocusCount.Text = any ? store.Slots.Sum(s => s.InLogic).ToString() : "–";
+            FocusCount.Text = any ? store.Slots.Sum(s => s.ToDo).ToString() : "–";
             FocusCount.Foreground = Brushes2.InLogic;
             FocusCountLabel.Text = " in logic";
             int chk = store.Slots.Sum(s => s.Checked), tot = store.Slots.Sum(s => s.Total);

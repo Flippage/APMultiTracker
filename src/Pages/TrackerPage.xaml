@@ -15,7 +15,7 @@
                             <ControlTemplate TargetType="GroupItem">
                                 <StackPanel>
                                     <Border x:Name="Head" Background="Transparent" Cursor="Hand" CornerRadius="6"
-                                            Padding="6,8,8,6" Margin="4,4,4,0" MouseLeftButtonUp="GroupHeader_Click"
+                                            Padding="6,6,8,3" Margin="4,4,4,0" MouseLeftButtonUp="GroupHeader_Click"
                                             ToolTip="Click to collapse or expand. Ctrl+click: all regions.">
                                         <StackPanel Orientation="Horizontal">
                                             <Viewbox x:Name="Chevron" Width="10" Height="10" Margin="0,1,8,0" RenderTransformOrigin="0.5,0.5">
@@ -79,7 +79,7 @@
 
         <!-- One check row (focused view) -->
         <DataTemplate x:Key="CheckRow" DataType="{x:Type local:CheckItem}">
-            <Grid Background="Transparent" ToolTip="{Binding StatusTip}">
+            <Grid Background="Transparent" ToolTip="{Binding Name}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="18"/>
                     <ColumnDefinition Width="*"/>
@@ -88,6 +88,13 @@
                 <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsEntrance, Converter={StaticResource Vis}}" Margin="0,3,0,1">
+                        <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource EntranceDimBrush}" ToolTip="{Binding StatusTip}">
+                            <TextBlock FontSize="11.5" Foreground="{StaticResource EntranceBrush}" TextTrimming="CharacterEllipsis">
+                                <Run Text="NEW ENTRANCE" FontWeight="Bold"/>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" Margin="0,3,0,1">
                         <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource HintDimBrush}">
                             <TextBlock FontSize="11.5" Foreground="{StaticResource HintBrush}" TextTrimming="CharacterEllipsis">
@@ -98,12 +105,15 @@
                     <TextBlock Text="{Binding Region}" FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis"
                                Visibility="{Binding DataContext.ShowRegionLine, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource Vis}}"/>
                 </StackPanel>
-                <Button x:Name="HideBtn" Grid.Column="2" Style="{StaticResource IconButton}" Width="30" Height="30" Opacity="0"
+                <Button x:Name="HideBtn" Grid.Column="2" Style="{StaticResource IconButton}" Width="26" Height="22" Opacity="0"
                         Tag="{StaticResource IconEyeOff}" ToolTip="Hide this check (mark as done)" Click="ToggleHidden_Click"/>
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                     <Setter TargetName="HideBtn" Property="Opacity" Value="1"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEntrance}" Value="True">
+                    <Setter TargetName="HideBtn" Property="Visibility" Value="Collapsed"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsHidden}" Value="True">
                     <Setter TargetName="HideBtn" Property="Tag" Value="{StaticResource IconEye}"/>
@@ -115,11 +125,15 @@
 
         <!-- Compact check row (overview columns) -->
         <DataTemplate x:Key="MiniRow" DataType="{x:Type local:CheckItem}">
-            <DockPanel ToolTip="{Binding Region}">
+            <DockPanel ToolTip="{Binding Name}">
                 <Ellipse Width="6" Height="6" Fill="{Binding DotBrush}" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,9,0"/>
                 <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource HintDimBrush}"
                         VerticalAlignment="Center" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" ToolTip="{Binding Hint}">
                     <TextBlock Text="HINT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>
+                </Border>
+                <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource EntranceDimBrush}"
+                        VerticalAlignment="Center" Visibility="{Binding IsEntrance, Converter={StaticResource Vis}}" ToolTip="{Binding StatusTip}">
+                    <TextBlock Text="NEW" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource EntranceBrush}"/>
                 </Border>
                 <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="13" TextTrimming="CharacterEllipsis"/>
             </DockPanel>
@@ -439,6 +453,7 @@
                     <StackPanel Margin="18,2,8,0">
                         <TextBlock x:Name="FTitle" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="FSub" FontSize="13" Foreground="{StaticResource SubBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                        <!-- Counts and go mode / goaled -->
                         <WrapPanel Margin="0,12,0,0">
                             <Border x:Name="FInLogicChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}">
                                 <TextBlock x:Name="FInLogicText" FontSize="12.5" Foreground="{StaticResource InLogicBrush}">
@@ -455,25 +470,10 @@
                                     <Run x:Name="FHinted" FontWeight="Bold" FontSize="14"/><Run Text=" hinted"/>
                                 </TextBlock>
                             </Border>
-                            <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="#1F1F1F">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="12.5" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center">
-                                        <Run x:Name="FChecked" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextBrush}"/><Run Text=" checked"/>
-                                    </TextBlock>
-                                    <Border Width="70" Height="4" CornerRadius="2" Background="#333333" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <Border x:Name="FBarFill" CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
-                                            <Border.RenderTransform>
-                                                <ScaleTransform x:Name="FBar" ScaleX="0"/>
-                                            </Border.RenderTransform>
-                                        </Border>
-                                    </Border>
-                                </StackPanel>
-                            </Border>
-                            <!-- Completion to two decimals, like the room page on archipelago.gg -->
-                            <Border x:Name="FPercentChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource AccentDimBrush}"
-                                    ToolTip="Checks done">
-                                <TextBlock FontSize="12.5" Foreground="{StaticResource AccentBrush}">
-                                    <Run x:Name="FPercent" FontWeight="Bold" FontSize="14"/>
+                            <Border x:Name="FEntranceChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource EntranceDimBrush}"
+                                    ToolTip="Entrances you can reach but haven't been through yet">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource EntranceBrush}">
+                                    <Run x:Name="FEntrances" FontWeight="Bold" FontSize="14"/><Run x:Name="FEntrancesLabel"/>
                                 </TextBlock>
                             </Border>
                             <Border x:Name="FGoChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource InLogicDimBrush}"
@@ -481,6 +481,30 @@
                                 <TextBlock x:Name="FGo" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
                             </Border>
                         </WrapPanel>
+                        <!-- Progress on its own line, so the counts above can come and go without moving it -->
+                        <StackPanel Orientation="Horizontal">
+                                <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="#1F1F1F">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontSize="12.5" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center">
+                                            <Run x:Name="FChecked" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextBrush}"/><Run Text=" checked"/>
+                                        </TextBlock>
+                                        <Border Width="70" Height="4" CornerRadius="2" Background="#333333" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <Border x:Name="FBarFill" CornerRadius="2" Background="{StaticResource AccentBrush}" RenderTransformOrigin="0,0.5">
+                                                <Border.RenderTransform>
+                                                    <ScaleTransform x:Name="FBar" ScaleX="0"/>
+                                                </Border.RenderTransform>
+                                            </Border>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                                <!-- Completion to two decimals, like the room page on archipelago.gg -->
+                                <Border x:Name="FPercentChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource AccentDimBrush}"
+                                        ToolTip="Checks done">
+                                    <TextBlock FontSize="12.5" Foreground="{StaticResource AccentBrush}">
+                                        <Run x:Name="FPercent" FontWeight="Bold" FontSize="14"/>
+                                    </TextBlock>
+                                </Border>
+                        </StackPanel>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -512,6 +536,8 @@
                                  ToolTip="Every check you haven't done">All remaining</RadioButton>
                     <RadioButton x:Name="FHintPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Hinted"
                                  ToolTip="Checks someone has hinted">Hinted</RadioButton>
+                    <RadioButton x:Name="FEntrancePill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Entrances"
+                                 ToolTip="Entrances you can reach but haven't been through yet" Visibility="Collapsed">New entrances</RadioButton>
                     <RadioButton x:Name="FHiddenPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Hidden"
                                  ToolTip="Checks you've hidden">Hidden</RadioButton>
                 </WrapPanel>
@@ -529,6 +555,25 @@
                 </Grid.RowDefinitions>
                 <ListBox x:Name="CheckListBox" Style="{StaticResource CheckList}" ItemTemplate="{StaticResource CheckRow}"
                          MouseDoubleClick="CheckList_DoubleClick">
+                    <!-- Compact rows: about as dense as the All games columns -->
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource PlainRow}">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" CornerRadius="6" Padding="10,2" Background="Transparent">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Explain" Click="CtxExplain_Click"/>

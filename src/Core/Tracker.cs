@@ -19,24 +19,29 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public bool IsHidden => Status == "ignored";
     public bool IsInLogic => Status == "in_logic";
     public bool IsGlitched => Status == "glitched";
+    /// <summary>A reachable entrance whose destination isn't known yet (entrance randomizers), like UT's unconnected lines.</summary>
+    public bool IsEntrance => Status == "entrance";
     public bool HasHint => !string.IsNullOrEmpty(Hint);
-    public int Rank => Status switch { "in_logic" => 0, "glitched" => 1, "out_of_logic" => 2, _ => 3 };
+    public int Rank => Status switch { "in_logic" or "entrance" => 0, "glitched" => 1, "out_of_logic" => 2, _ => 3 };
 
     public Brush DotBrush => Status switch
     {
         "in_logic" => Brushes2.InLogic,
+        "entrance" => Brushes2.Entrance,
         "glitched" => Brushes2.Glitched,
         _ => Brushes2.OutLogic,
     };
     public Brush NameBrush => Status switch
     {
         "in_logic" => Brushes2.Text,
+        "entrance" => Brushes2.Entrance,   // like UT's unconnected lines
         "glitched" => Brushes2.GlitchedText,
         _ => Brushes2.Dim,
     };
     public string StatusTip => Status switch
     {
         "in_logic" => "In logic",
+        "entrance" => "An entrance you can reach but haven't been through yet. Where it leads shows up once you've found it",
         "glitched" => "Reachable with glitches / tricks",
         "ignored" => "Hidden",
         _ => "Out of logic",
@@ -76,6 +81,7 @@ internal static class Brushes2
     public static readonly Brush Danger = F(0xF87171);
     public static readonly Brush Sub = F(0x9A9A9A);
     public static readonly Brush Hint = F(0xC084FC);
+    public static readonly Brush Entrance = F(0x89F336);   // UT's colour for unconnected entrances
 }
 
 /// <summary>Live state of one tracked slot, bound by the UI.</summary>
@@ -114,6 +120,10 @@ public sealed class SlotView : INotifyPropertyChanged
     public int Glitched { get; private set; }
     public int Hinted { get; private set; }
     public int Hidden { get; private set; }
+    /// <summary>Reachable entrances that don't lead anywhere known yet.</summary>
+    public int Entrances { get; private set; }
+    /// <summary>Things to do now: checks in logic plus new entrances to go through.</summary>
+    public int ToDo => InLogic + Entrances;
     public string GoMode { get; private set; } = "no";
     /// <summary>The slot has reported its goal as complete (client status GOAL).</summary>
     public bool Goal { get; private set; }
@@ -145,7 +155,7 @@ public sealed class SlotView : INotifyPropertyChanged
 
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
-        var shown = locs.Where(l => l.Status is "in_logic" or "glitched");
+        var shown = locs.Where(l => l.Status is "in_logic" or "glitched" or "entrance");
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
                 : shown.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
@@ -159,10 +169,12 @@ public sealed class SlotView : INotifyPropertyChanged
     public string CheckedText => Total > 0 ? $"{Checked}/{Total}" : "–";
     public string PercentText => Total > 0 ? $"{Progress * 100:0}%" : "";
     /// <summary>"BK": nothing in logic and the goal isn't reachable either (so not goaled and not in go mode).</summary>
-    public bool IsBK => HasData && InLogic == 0 && !Goal && GoMode != "yes";
-    public string InLogicText => IsBK ? "BK" : HasData ? InLogic.ToString() : "–";
+    public bool IsBK => HasData && ToDo == 0 && !Goal && GoMode != "yes";
+    public string InLogicText => IsBK ? "BK" : HasData ? ToDo.ToString() : "–";
     public Brush InLogicBrush => IsBK ? Brushes2.Danger : Brushes2.InLogic;
-    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete" : "Checks in logic";
+    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete"
+                              : Entrances > 0 ? $"{InLogic} {(InLogic == 1 ? "check" : "checks")} in logic + {Entrances} new {(Entrances == 1 ? "entrance" : "entrances")}"
+                              : "Checks in logic";
     public bool IsDone => HasData && Total > 0 && Checked >= Total;
     public bool IsGoMode => GoMode == "yes";
     /// <summary>Show the go mode pill: the goal can be reached now (in logic, or with glitches), like UT's "Go mode"
@@ -250,7 +262,17 @@ public sealed class SlotView : INotifyPropertyChanged
             locs.Clear();
             Checked = Total;
             InLogic = Glitched = Hinted = Hidden = 0;
+            Entrances = 0;
         }
+        if (m["entrances"] is JsonArray ents)
+            foreach (var n in ents)
+                if (n is JsonObject o && o["name"]?.GetValue<string>() is string name)
+                {
+                    string region = o["region"]?.GetValue<string>() ?? "";
+                    // Negative ids keep them apart from locations; explain / path look at the room the entrance is in.
+                    locs.Add(new CheckItem(-1 - (name.GetHashCode() & 0x3FFFFFFF), name, region, "entrance", false, null, region));
+                }
+        Entrances = locs.Count(l => l.IsEntrance);
         Locations = locs;
 
         var items = new List<ItemCount>();
@@ -320,7 +342,7 @@ public sealed class LiveWorld
     public ObservableCollection<FeedMessage> Feed { get; } = new();
     public LiveWorld(Multiworld world) => World = world;
 
-    public int InLogic => Slots.Sum(s => s.InLogic);
+    public int InLogic => Slots.Sum(s => s.ToDo);
     public bool HasData => Slots.Any(s => s.HasData);
 
     public void AddFeed(FeedMessage m)

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.10.0
+
+- **New entrances** (engine v0.4.2): in games with entrance randomizers that reveal entrances as you find them (like
+  SM64: Spicy Mycena 64's painting shuffle), entrances you can reach but haven't been through yet now show in the
+  check lists, like Universal Tracker's unconnected entrances: the entrance's name in lime with a **NEW ENTRANCE**
+  tag, under the region it's in. Once you go through one, it's replaced by the checks behind it.
+- New entrances count toward a game's number on its card, so a game whose only way forward is a new painting isn't
+  shown as BK. The focused game's header shows how many there are.
+- **New entrances filter**: a **New entrances (N)** filter next to Hinted lists just the new entrances. It shows for
+  games that have some.
+- **Denser check list**: the focused game's checks take about 40% less height each (smaller hide button, tighter
+  rows and region headers), so a lot more fit on screen.
+- **Focused header**: the counts (in logic, glitched, hinted, new entrances) and go mode / goaled sit on the first
+  line, the checked count with its bar and the completion % on the second.
+- Hovering a check (in the focused list or an All games column) shows its full name.
+
 ## v0.9.2
 
 - **Completion %**: the focused game's header shows how much of the game is checked, to two decimal places like

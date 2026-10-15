@@ -427,6 +427,19 @@ class SlotContext(CommonContext):
         elif ret.glitches_state is not None and mw.has_beaten_game(ret.glitches_state, core.player_id):
             go_mode = "glitched"
 
+        # Entrances you can reach that don't lead anywhere known yet (deferred entrance randomizers): UT lists these
+        # as "unconnected" lines until the game reports where they go.
+        unconnected = getattr(ret, "unconnected_entrances", None)
+        if unconnected is None and ret.state is not None:
+            unconnected = [e for region in ret.state.reachable_regions[core.player_id] for e in region.exits
+                           if e.connected_region is None and e.can_reach(ret.state)]
+        entrances, seen = [], set()
+        for e in unconnected or []:
+            if e.name in seen:
+                continue
+            seen.add(e.name)
+            entrances.append({"name": e.name, "region": e.parent_region.name if e.parent_region else ""})
+
         errors = [line.location_label for group, lines in core.log_lines.items() if group < 0 for line in lines]
         items = [{"name": name, "count": count, "prog": name in ret.prog_items}
                  for name, count in ret.all_items.items()]
@@ -448,6 +461,7 @@ class SlotContext(CommonContext):
             "go_mode": go_mode,
             "goal": inputs["goal"],
             "auto_release": inputs["auto_release"],
+            "entrances": [] if inputs["goal"] and inputs["auto_release"] else entrances,
             "locations": locations,
             "items": items,
             "errors": errors,

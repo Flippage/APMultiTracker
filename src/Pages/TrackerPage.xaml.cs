@@ -80,6 +80,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             CheckFilter.All => FAllPill,
             CheckFilter.Hinted => FHintPill,
             CheckFilter.Hidden => FHiddenPill,
+            CheckFilter.Entrances => FEntrancePill,
             _ => FInLogicPill,
         }).IsChecked = true;
         _syncing = false;
@@ -135,7 +136,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void UpdateAllCount()
     {
         var slots = App.Tracker.Slots;
-        AllCount.Text = slots.Any(s => s.HasData) ? slots.Sum(s => s.InLogic).ToString() : "–";
+        AllCount.Text = slots.Any(s => s.HasData) ? slots.Sum(s => s.ToDo).ToString() : "–";
     }
 
     /// <summary>Columns share the width; with many games they keep a readable minimum and scroll sideways.</summary>
@@ -182,6 +183,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FGlitchedChip.Visibility = s.Glitched > 0 ? Visibility.Visible : Visibility.Collapsed;
         FHinted.Text = s.Hinted.ToString();
         FHintedChip.Visibility = s.Hinted > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FEntrances.Text = s.Entrances.ToString();
+        FEntrancesLabel.Text = s.Entrances == 1 ? " new entrance" : " new entrances";
+        FEntranceChip.Visibility = s.Entrances > 0 ? Visibility.Visible : Visibility.Collapsed;
         FChecked.Text = s.HasData ? $"{s.Checked}/{s.Total}" : "–";
         FPercentChip.Visibility = s.HasData && s.Total > 0 ? Visibility.Visible : Visibility.Collapsed;
         FPercent.Text = (s.Progress * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
@@ -195,6 +199,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FGoChip.BorderBrush = FGo.Foreground = (Brush)FindResource(s.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
         FHiddenPill.Content = s.Hidden > 0 ? $"Hidden ({s.Hidden})" : "Hidden";
         FHintPill.Content = s.Hinted > 0 ? $"Hinted ({s.Hinted})" : "Hinted";
+        FEntrancePill.Content = s.Entrances > 0 ? $"New entrances ({s.Entrances})" : "New entrances";
+        // Only for games that have some (or while it's the chosen filter, so it doesn't vanish under you)
+        FEntrancePill.Visibility = s.Entrances > 0 || App.Config.Filter == CheckFilter.Entrances ? Visibility.Visible : Visibility.Collapsed;
 
         // Notice: errors and busy states first, then UT warnings.
         string? notice = null;
@@ -223,10 +230,11 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         var filter = App.Config.Filter;
         IEnumerable<CheckItem> items = s.Locations.Where(l => filter switch
         {
-            CheckFilter.InLogic => l.IsInLogic,
-            CheckFilter.Reachable => l.IsInLogic || l.IsGlitched,
+            CheckFilter.InLogic => l.IsInLogic || l.IsEntrance,
+            CheckFilter.Reachable => l.IsInLogic || l.IsEntrance || l.IsGlitched,
             CheckFilter.Hinted => l.HasHint && !l.IsHidden,
             CheckFilter.Hidden => l.IsHidden,
+            CheckFilter.Entrances => l.IsEntrance,
             _ => !l.IsHidden,
         });
         if (q.Length > 0)
@@ -254,6 +262,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                     CheckFilter.InLogic => ("Nothing in logic right now", "Waiting on items from the other games. Try “All remaining” to see what's left."),
                     CheckFilter.Hinted => ("No hints", "Checks someone hints for you will show up here."),
                     CheckFilter.Hidden => ("No hidden checks", "Hover a check and click the eye to hide it."),
+                    CheckFilter.Entrances => ("No new entrances", "Entrances you can reach but haven't been through yet show up here."),
                     _ => ("Nothing here", ""),
                 };
         }
@@ -567,7 +576,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
     private async void CtxHide_Click(object sender, RoutedEventArgs e)
     {
-        if (_shown == null || CheckListBox.SelectedItem is not CheckItem c) return;
+        if (_shown == null || CheckListBox.SelectedItem is not CheckItem c || c.IsEntrance) return;
         await App.Tracker.SetHiddenAsync(_shown, new[] { c.Id }, !c.IsHidden);
     }
 
@@ -764,7 +773,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         if (App.Tracker.Slots.Count == 0) throw new InvalidOperationException("Self-test expected demo slots.");
         App.Tracker.SetFocus(App.Tracker.Slots[0]);
         UpdateLayout();
-        foreach (var pill in new[] { FReachPill, FAllPill, FHintPill, FHiddenPill, FInLogicPill })
+        foreach (var pill in new[] { FReachPill, FAllPill, FHintPill, FHiddenPill, FEntrancePill, FInLogicPill })
         {
             pill.IsChecked = true;
             UpdateLayout();

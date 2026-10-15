@@ -59,7 +59,7 @@ public sealed class AppConfig
     public bool AlwaysOnTop { get; set; }
 }
 
-public enum CheckFilter { InLogic, Reachable, All, Hinted, Hidden }
+public enum CheckFilter { InLogic, Reachable, All, Hinted, Hidden, Entrances }
 
 /// <summary>A saved room: where to connect and which slots to track.</summary>
 public sealed class Multiworld

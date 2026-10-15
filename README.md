@@ -38,6 +38,7 @@ in one place, with a faster, cleaner interface.
 | 🍔 **BK** | A game with nothing in logic shows a red **BK** instead of 0, so you can see at a glance who's stuck. |
 | 🏁 **Go mode** | A **GO MODE** badge on a game as soon as everything needed to finish it is in logic (like UT's Go mode), with a line in the feed when it happens. Shown in yellow if it needs glitches. |
 | ✅ **Goaled** | A finished game gets a green tick and a **GOALED** pill. If the room releases on goal, its checks are cleared and its bar fills up. |
+| 🚪 **New entrances** | Entrance randomizers that reveal entrances as you go (like Spicy Mycena 64's paintings): entrances you can reach but haven't been through yet are listed, like UT's unconnected entrances, with their own filter. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |

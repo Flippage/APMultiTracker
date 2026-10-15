@@ -99,6 +99,10 @@ public static class Demo
                 ["checked"] = g.Checked, ["total"] = g.Total, ["in_logic"] = inLogic,
                 ["glitched"] = locs.Count(l => l!["status"]!.GetValue<string>() == "glitched"),
                 ["hinted"] = locs.Count(l => l!["hint"] != null), ["ignored"] = 1,
+                ["entrances"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_ENT") == "1"
+                    ? new JsonArray(new JsonObject { ["name"] = "Kokiri Forest -> Deku Tree", ["region"] = g.Regions[0] },
+                                    new JsonObject { ["name"] = "Hyrule Field -> Lake Hylia", ["region"] = g.Regions[1] })
+                    : new JsonArray(),
                 ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
