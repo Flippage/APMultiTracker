@@ -98,6 +98,7 @@ public partial class SettingsPage : UserControl
 
         _loading = true;
         TopToggle.IsChecked = App.Config.AlwaysOnTop;
+        HideExcludedToggle.IsChecked = App.Config.HideExcluded;
         StartupToggle.IsChecked = App.Config.StartWithWindows;
         _loading = false;
     }
@@ -162,6 +163,14 @@ public partial class SettingsPage : UserControl
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{Log.Dir}\"") { UseShellExecute = true });
         }
         catch { }
+    }
+
+    private void HideExcluded_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Config.HideExcluded = HideExcludedToggle.IsChecked == true;
+        App.SaveConfig();
+        App.Tracker.RefreshViews();
     }
 
     private void Top_Changed(object sender, RoutedEventArgs e)

@@ -170,6 +170,20 @@
                 </DockPanel>
             </Border>
 
+            <!-- Tracker -->
+            <TextBlock Text="TRACKER" Style="{StaticResource Caps}" Margin="0,26,0,8"/>
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12">
+                <DockPanel Margin="20,14">
+                    <CheckBox x:Name="HideExcludedToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}"
+                              Checked="HideExcluded_Changed" Unchecked="HideExcluded_Changed"/>
+                    <StackPanel>
+                        <TextBlock Text="Hide excluded checks" Style="{StaticResource ItemTitle}"/>
+                        <TextBlock Text="Checks excluded in a player's YAML only ever hold filler. Shown dimmed with an EXCLUDED tag, or hide them completely. They never count toward a game's number."
+                                   Style="{StaticResource Sub}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
             <!-- App -->
             <TextBlock Text="APP" Style="{StaticResource Caps}" Margin="0,26,0,8"/>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12">

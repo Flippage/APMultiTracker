@@ -78,6 +78,9 @@ def apply_host_settings(core) -> None:
      core.sorting_priorities, core.sorting_method) = core._set_host_settings()
     if core.enforce_deferred_connections is None:
         core.enforce_deferred_connections = deferred
+    # Always report excluded checks with their real status; the app decides whether to show them
+    # (with UT's hide_excluded_locations on, they'd otherwise look out of logic).
+    core.hide_excluded = False
 
 
 def last_line(text: str) -> str:

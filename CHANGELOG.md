@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.1
+
+- **Excluded checks** (engine v0.4.3): checks excluded in a player's YAML (they only ever hold filler) are shown
+  dimmed with an **EXCLUDED** tag, after the other checks in their region, and no longer count toward a game's number
+  or keep it from showing BK. Settings → Tracker → **Hide excluded checks** leaves them out of the lists completely.
+  Like in Universal Tracker, this works for games whose logic is built from the player's YAML.
+- Fix: with Universal Tracker's `hide_excluded_locations` turned on in `host.yaml`, reachable excluded checks were
+  shown as out of logic.
+- Fix: in a narrow Tracker (e.g. with the feed docked), the completion % was cut off; it now moves to the next line.
+
 ## v0.10.0
 
 - **New entrances** (engine v0.4.2): in games with entrance randomizers that reveal entrances as you find them (like

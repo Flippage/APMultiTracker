@@ -55,6 +55,7 @@ public static class Demo
             ActiveMultiworldId = mw.Id,
             ConnectedMultiworldIds = { mw.Id, "demo2" },
             FocusByWorld = { [mw.Id] = "d1" },   // start on a game, like a real session (All games not laid out yet)
+            HideExcluded = Environment.GetEnvironmentVariable("APMT_SHOT_HIDE_EXCL") == "1",   // check shot
         };
     }
 
@@ -77,7 +78,9 @@ public static class Demo
                 locs.Add(new JsonObject
                 {
                     ["id"] = 1000 + n, ["name"] = name, ["region"] = g.Regions[n % g.Regions.Length],
-                    ["status"] = status, ["excluded"] = false, ["hint"] = hint,
+                    ["status"] = status, ["hint"] = hint,
+                    // Check shot: a few excluded Hollow Knight checks
+                    ["excluded"] = g.Id == "d1" && n is 3 or 7 or 11 && Environment.GetEnvironmentVariable("APMT_SHOT_EXCL") == "1",
                 });
                 n++;
             }

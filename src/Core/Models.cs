@@ -35,6 +35,8 @@ public sealed class AppConfig
     public bool GroupByRegion { get; set; } = true;
     public bool ShowRegionNames { get; set; } = true;
     public bool OverviewGroupByRegion { get; set; }
+    /// <summary>Leave excluded checks out of the lists (like UT's hide_excluded_locations).</summary>
+    public bool HideExcluded { get; set; }
     public double ExplainHeight { get; set; } = 200;
     /// <summary>Per slot (SlotRef.Id): region groups collapsed in the check list.</summary>
     public Dictionary<string, List<string>> CollapsedRegions { get; set; } = new();

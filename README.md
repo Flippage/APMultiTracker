@@ -41,6 +41,7 @@ in one place, with a faster, cleaner interface.
 | 🚪 **New entrances** | Entrance randomizers that reveal entrances as you go (like Spicy Mycena 64's paintings): entrances you can reach but haven't been through yet are listed, like UT's unconnected entrances, with their own filter. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`). |
+| 🚫 **Excluded checks** | Checks excluded in a YAML are dimmed and tagged (or hidden, in Settings) and never count toward a game's number. |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |
 | 💬 **Feed** | The room's messages as they happen, like the Text Client: items sent, hints, chat and goals, colour-coded and filterable. Chat or `!hint` from any of your slots. Show it on its own page or docked beside the Tracker. |
 | 🌍 **Several multiworlds at once** | Save rooms with their server and slots (**Find slots in this room** lists everyone). Keep several connected and switch between them instantly. |

@@ -22,7 +22,10 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     /// <summary>A reachable entrance whose destination isn't known yet (entrance randomizers), like UT's unconnected lines.</summary>
     public bool IsEntrance => Status == "entrance";
     public bool HasHint => !string.IsNullOrEmpty(Hint);
-    public int Rank => Status switch { "in_logic" or "entrance" => 0, "glitched" => 1, "out_of_logic" => 2, _ => 3 };
+    /// <summary>Sort order: by status, with excluded checks after the others of the same status (as UT groups them).</summary>
+    public int Rank => Status switch { "in_logic" or "entrance" => 0, "glitched" => 2, "out_of_logic" => 4, _ => 6 } + (Excluded ? 1 : 0);
+    /// <summary>Shown with an EXCLUDED tag (not when hidden: the Hidden list is just that).</summary>
+    public bool ShowExcluded => Excluded && !IsHidden;
 
     public Brush DotBrush => Status switch
     {
@@ -31,7 +34,7 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
         "glitched" => Brushes2.Glitched,
         _ => Brushes2.OutLogic,
     };
-    public Brush NameBrush => Status switch
+    public Brush NameBrush => Excluded && Status is "in_logic" or "glitched" ? Brushes2.Sub : Status switch
     {
         "in_logic" => Brushes2.Text,
         "entrance" => Brushes2.Entrance,   // like UT's unconnected lines
@@ -40,6 +43,8 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     };
     public string StatusTip => Status switch
     {
+        "in_logic" when Excluded => "In logic (excluded)",
+        "glitched" when Excluded => "Reachable with glitches / tricks (excluded)",
         "in_logic" => "In logic",
         "entrance" => "An entrance you can reach but haven't been through yet. Where it leads shows up once you've found it",
         "glitched" => "Reachable with glitches / tricks",
@@ -155,7 +160,7 @@ public sealed class SlotView : INotifyPropertyChanged
 
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
-        var shown = locs.Where(l => l.Status is "in_logic" or "glitched" or "entrance");
+        var shown = locs.Where(l => l.Status is "in_logic" or "glitched" or "entrance" && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
                 : shown.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
@@ -273,6 +278,9 @@ public sealed class SlotView : INotifyPropertyChanged
                     locs.Add(new CheckItem(-1 - (name.GetHashCode() & 0x3FFFFFFF), name, region, "entrance", false, null, region));
                 }
         Entrances = locs.Count(l => l.IsEntrance);
+        // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
+        InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);
+        Glitched = locs.Count(l => l.IsGlitched && !l.Excluded);
         Locations = locs;
 
         var items = new List<ItemCount>();
@@ -602,6 +610,15 @@ public sealed class TrackerStore
         ["segments"] = new JsonArray(new JsonObject { ["text"] = text, ["color"] = "blue" }),
         ["players"] = new JsonArray(),
     });
+
+    /// <summary>Re-sorts every game's lists after a display setting changed (e.g. Hide excluded checks).</summary>
+    public void RefreshViews()
+    {
+        foreach (var w in _live.Values)
+            foreach (var s in w.Slots)
+                s.ApplyOverviewGrouping();
+        Changed?.Invoke(null);
+    }
 
     /// <summary>When the engine goes away, every slot is offline until it's back.</summary>
     public void MarkAllOffline()

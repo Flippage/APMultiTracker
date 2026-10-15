@@ -88,6 +88,11 @@
                 <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding ShowExcluded, Converter={StaticResource Vis}}" Margin="0,3,0,1">
+                        <Border CornerRadius="6" Padding="7,1,7,2" Background="#262626" ToolTip="Excluded in this player's YAML: it only ever holds filler">
+                            <TextBlock Text="EXCLUDED" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource SubBrush}"/>
+                        </Border>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsEntrance, Converter={StaticResource Vis}}" Margin="0,3,0,1">
                         <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource EntranceDimBrush}" ToolTip="{Binding StatusTip}">
                             <TextBlock FontSize="11.5" Foreground="{StaticResource EntranceBrush}" TextTrimming="CharacterEllipsis">
@@ -130,6 +135,11 @@
                 <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource HintDimBrush}"
                         VerticalAlignment="Center" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" ToolTip="{Binding Hint}">
                     <TextBlock Text="HINT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>
+                </Border>
+                <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="#262626"
+                        VerticalAlignment="Center" Visibility="{Binding ShowExcluded, Converter={StaticResource Vis}}"
+                        ToolTip="Excluded in this player's YAML: it only ever holds filler">
+                    <TextBlock Text="EXCL" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource SubBrush}"/>
                 </Border>
                 <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource EntranceDimBrush}"
                         VerticalAlignment="Center" Visibility="{Binding IsEntrance, Converter={StaticResource Vis}}" ToolTip="{Binding StatusTip}">
@@ -482,7 +492,7 @@
                             </Border>
                         </WrapPanel>
                         <!-- Progress on its own line, so the counts above can come and go without moving it -->
-                        <StackPanel Orientation="Horizontal">
+                        <WrapPanel>
                                 <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="#1F1F1F">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock FontSize="12.5" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center">
@@ -504,7 +514,7 @@
                                         <Run x:Name="FPercent" FontWeight="Bold" FontSize="14"/>
                                     </TextBlock>
                                 </Border>
-                        </StackPanel>
+                        </WrapPanel>
                     </StackPanel>
                 </DockPanel>
             </Border>

@@ -228,7 +228,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         if (s == null) return;
         string q = Search.Text.Trim();
         var filter = App.Config.Filter;
-        IEnumerable<CheckItem> items = s.Locations.Where(l => filter switch
+        bool hideExcluded = App.Config.HideExcluded && filter != CheckFilter.Hidden;
+        IEnumerable<CheckItem> items = s.Locations.Where(l => !(hideExcluded && l.Excluded)).Where(l => filter switch
         {
             CheckFilter.InLogic => l.IsInLogic || l.IsEntrance,
             CheckFilter.Reachable => l.IsInLogic || l.IsEntrance || l.IsGlitched,
