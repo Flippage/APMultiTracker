@@ -444,6 +444,15 @@ class SlotContext(CommonContext):
             entrances.append({"name": e.name, "region": e.parent_region.name if e.parent_region else ""})
 
         errors = [line.location_label for group, lines in core.log_lines.items() if group < 0 for line in lines]
+        # Events the logic has reached (UT's /event_inventory and /event_locations): the event and where it's from.
+        events, seen_events = [], set()
+        if ret.state is not None:
+            for loc in ret.state.advancements:
+                if loc.player != core.player_id or loc.item is None or loc.name in seen_events:
+                    continue
+                seen_events.add(loc.name)
+                events.append({"name": loc.item.name, "location": loc.name})
+            events.sort(key=lambda e: (e["name"], e["location"]))
         items = [{"name": name, "count": count, "prog": name in ret.prog_items}
                  for name, count in ret.all_items.items()]
         return {
@@ -467,6 +476,7 @@ class SlotContext(CommonContext):
             "entrances": [] if inputs["goal"] and inputs["auto_release"] else entrances,
             "locations": locations,
             "items": items,
+            "events": events,
             "errors": errors,
             "warning": self.warning,
         }

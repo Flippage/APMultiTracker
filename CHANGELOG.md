@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.3
+
+- **Events** (engine v0.4.4): the Items panel (the **Items** toggle) has an **Events** tab next to Items received,
+  listing the events the logic has reached, like Universal Tracker's `/event_inventory` and `/event_locations`: each
+  event, with the location it comes from when that's different. Events are milestones the game's logic uses, like
+  beating a boss or opening a door.
+
 ## v0.10.2
 
 - **Hide or unhide everything at once**: right-click the check list for **Hide all in-logic checks…** (like Universal

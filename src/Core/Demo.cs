@@ -56,6 +56,8 @@ public static class Demo
             ConnectedMultiworldIds = { mw.Id, "demo2" },
             FocusByWorld = { [mw.Id] = "d1" },   // start on a game, like a real session (All games not laid out yet)
             HideExcluded = Environment.GetEnvironmentVariable("APMT_SHOT_HIDE_EXCL") == "1",   // check shot
+            ShowItems = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") is "1" or "items",   // check shots
+            ShowEvents = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") == "1",
         };
     }
 
@@ -105,6 +107,11 @@ public static class Demo
                 ["entrances"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_ENT") == "1"
                     ? new JsonArray(new JsonObject { ["name"] = "Kokiri Forest -> Deku Tree", ["region"] = g.Regions[0] },
                                     new JsonObject { ["name"] = "Hyrule Field -> Lake Hylia", ["region"] = g.Regions[1] })
+                    : new JsonArray(),
+                ["events"] = g.Id == "d1"
+                    ? new JsonArray(new JsonObject { ["name"] = "Defeated_False_Knight", ["location"] = "Defeated_False_Knight" },
+                                    new JsonObject { ["name"] = "Can_Stag", ["location"] = "Dirtmouth_Stag_Event" },
+                                    new JsonObject { ["name"] = "Opened_Black_Egg_Temple", ["location"] = "Opened_Black_Egg_Temple" })
                     : new JsonArray(),
                 ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,

@@ -219,7 +219,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FNoticeBtn.Visibility = retry ? Visibility.Visible : Visibility.Collapsed;
 
         ItemsHeader.Text = $"ITEMS RECEIVED · {s.Items.Sum(i => i.Count)}";
+        EventsHeader.Text = $"EVENTS · {s.Events.Count}";
         ItemsList.ItemsSource = s.Items;
+        EventsList.ItemsSource = s.Events;
+        ApplyItemsTab(s);
         RefreshList();
     }
 
@@ -610,6 +613,29 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         string what = ids.Count == 1 ? "1 hidden check" : $"{ids.Count} hidden checks";
         if (!await w.ConfirmAsync($"Unhide {what}?", $"Shows every check you've hidden for {s.SlotName} ({s.Title}) again.", "Unhide all")) return;
         if (_shown == s) await App.Tracker.SetHiddenAsync(s, ids, false);
+    }
+
+    // ------------------------------------------------------------------ items panel tabs
+
+    private void ApplyItemsTab(SlotView s)
+    {
+        bool events = App.Config.ShowEvents;
+        ItemsList.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
+        EventsList.Visibility = events ? Visibility.Visible : Visibility.Collapsed;
+        EventsEmpty.Visibility = events && s.Events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ItemsHeader.Foreground = (Brush)FindResource(events ? "SubBrush" : "AccentBrush");
+        EventsHeader.Foreground = (Brush)FindResource(events ? "AccentBrush" : "SubBrush");
+    }
+
+    private void ItemsTab_Click(object sender, MouseButtonEventArgs e) => SetItemsTab(false);
+    private void EventsTab_Click(object sender, MouseButtonEventArgs e) => SetItemsTab(true);
+
+    private void SetItemsTab(bool events)
+    {
+        if (App.Config.ShowEvents == events) return;
+        App.Config.ShowEvents = events;
+        App.SaveConfig();
+        if (_shown != null) ApplyItemsTab(_shown);
     }
 
     private void CtxCopy_Click(object sender, RoutedEventArgs e)

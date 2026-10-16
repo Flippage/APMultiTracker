@@ -652,7 +652,26 @@
 
                 <Border x:Name="ItemsPanel" Grid.Column="1" Grid.RowSpan="3" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
                     <DockPanel>
-                        <TextBlock x:Name="ItemsHeader" DockPanel.Dock="Top" Style="{StaticResource Caps}" Margin="2,0,0,8"/>
+                        <!-- Two tabs: items received / events (UT's /event_inventory) -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="2,0,0,8">
+                            <TextBlock x:Name="ItemsHeader" Style="{StaticResource Caps}" Cursor="Hand" MouseLeftButtonUp="ItemsTab_Click"
+                                       ToolTip="Items you've received"/>
+                            <TextBlock x:Name="EventsHeader" Style="{StaticResource Caps}" Cursor="Hand" Margin="14,0,0,0" MouseLeftButtonUp="EventsTab_Click"
+                                       ToolTip="Events the logic has reached, like UT's /event_inventory"/>
+                        </StackPanel>
+                        <TextBlock x:Name="EventsEmpty" DockPanel.Dock="Top" Style="{StaticResource Sub}" Margin="2,4,10,0" TextWrapping="Wrap"
+                                   Visibility="Collapsed" Text="No events reached yet. Events are milestones the game's logic uses, like beating a boss."/>
+                        <ListBox x:Name="EventsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0" Visibility="Collapsed">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:EventItem}">
+                                    <StackPanel ToolTip="{Binding Location}">
+                                        <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="{Binding Location}" FontSize="11.5" TextTrimming="CharacterEllipsis" Foreground="{StaticResource SubBrush}"
+                                                   Visibility="{Binding ShowLocation, Converter={StaticResource Vis}}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                         <ListBox x:Name="ItemsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:ItemCount}">

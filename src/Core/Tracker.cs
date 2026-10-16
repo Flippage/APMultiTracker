@@ -55,6 +55,13 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
 
 public sealed record ItemCount(string Name, int Count, bool Progression);
 
+/// <summary>An event the logic has reached (UT's /event_inventory), and the event location it came from.</summary>
+public sealed record EventItem(string Name, string Location)
+{
+    /// <summary>Most games name the event after its location; only show the location when it adds something.</summary>
+    public bool ShowLocation => Location.Length > 0 && Location != Name;
+}
+
 internal static class Json
 {
     /// <summary>A number from a JsonNode whether it was parsed (JsonElement) or built in code (int/long).</summary>
@@ -138,6 +145,7 @@ public sealed class SlotView : INotifyPropertyChanged
     public bool Released => Goal && AutoRelease;
     public IReadOnlyList<CheckItem> Locations { get; private set; } = Array.Empty<CheckItem>();
     public IReadOnlyList<ItemCount> Items { get; private set; } = Array.Empty<ItemCount>();
+    public IReadOnlyList<EventItem> Events { get; private set; } = Array.Empty<EventItem>();
     public IReadOnlyList<string> Errors { get; private set; } = Array.Empty<string>();
     public bool HasData { get; private set; }
 
@@ -289,6 +297,10 @@ public sealed class SlotView : INotifyPropertyChanged
                 if (n is JsonObject o)
                     items.Add(new ItemCount(o["name"]?.GetValue<string>() ?? "?", (int)Json.Long(o["count"], 1), o["prog"]?.GetValue<bool>() ?? false));
         Items = items.OrderByDescending(i => i.Progression).ThenBy(i => i.Name, NaturalComparer.Instance).ToList();
+        Events = (m["events"] as JsonArray)?.OfType<JsonObject>()
+                     .Select(o => new EventItem(o["name"]?.GetValue<string>() ?? "?", o["location"]?.GetValue<string>() ?? ""))
+                     .OrderBy(e => e.Name, NaturalComparer.Instance).ToList()
+                 ?? new List<EventItem>();
 
         Errors = (m["errors"] as JsonArray)?.Select(e => e?.GetValue<string>() ?? "").Where(e => e.Length > 0).ToList()
                  ?? new List<string>();
@@ -305,6 +317,7 @@ public sealed class SlotView : INotifyPropertyChanged
         HasData = false;
         Locations = Array.Empty<CheckItem>();
         Items = Array.Empty<ItemCount>();
+        Events = Array.Empty<EventItem>();
         Overview.Clear();
         NotifyAll();
     }
