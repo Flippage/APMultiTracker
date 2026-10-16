@@ -9,6 +9,8 @@ The engine: one process, many tracked slots.
 """
 from __future__ import annotations
 
+import collections
+
 import argparse
 import asyncio
 import json
@@ -310,6 +312,10 @@ class SlotContext(CommonContext):
         }
         saved = Utils.persistent_load().get(PERSIST_KEY, {}).get(self.persist_id, {})
         core.ignored_locations = set(saved.get("ignored", []))
+        # Pretend items (UT's /manually_collect), kept only if the game still has them
+        names = set(world.item_name_to_id)
+        if hasattr(core, "manual_items"):
+            core.manual_items = [n for n in saved.get("manual", []) if n in names]
 
         keys = getattr(world, "found_entrances_datastorage_key", None)
         callback = getattr(world, "reconnect_found_entrances", None)
@@ -453,8 +459,10 @@ class SlotContext(CommonContext):
                 seen_events.add(loc.name)
                 events.append({"name": loc.item.name, "location": loc.name})
             events.sort(key=lambda e: (e["name"], e["location"]))
-        items = [{"name": name, "count": count, "prog": name in ret.prog_items}
-                 for name, count in ret.all_items.items()]
+        # UT counts pretend items (/manually_collect) as received; they aren't, so leave them out here.
+        pretend = collections.Counter(getattr(core, "manual_items", []))
+        items = [{"name": name, "count": count - pretend[name], "prog": name in ret.prog_items}
+                 for name, count in ret.all_items.items() if count - pretend[name] > 0]
         return {
             "type": "slot",
             "id": self.sid,
@@ -477,6 +485,7 @@ class SlotContext(CommonContext):
             "locations": locations,
             "items": items,
             "events": events,
+            "manual_items": list(getattr(core, "manual_items", [])),
             "errors": errors,
             "warning": self.warning,
         }
@@ -569,7 +578,34 @@ class SlotContext(CommonContext):
             self.core.ignored_locations.update(location_ids)
         else:
             self.core.ignored_locations.difference_update(location_ids)
-        Utils.persistent_store(PERSIST_KEY, self.persist_id, {"ignored": sorted(self.core.ignored_locations)})
+        self._persist()
+        self.watcher_event.set()
+
+    def _persist(self) -> None:
+        """Hidden checks and pretend items, saved per seed and slot (like UT's save_entered_commands)."""
+        Utils.persistent_store(PERSIST_KEY, self.persist_id, {
+            "ignored": sorted(self.core.ignored_locations),
+            "manual": list(getattr(self.core, "manual_items", [])),
+        })
+
+    def game_item_names(self) -> list[str]:
+        if self.core is None:
+            raise EngineError(f"{self.slot_name} isn't tracking yet.")
+        return sorted(self.core.get_current_world().item_name_to_id)
+
+    async def set_manual(self, items: list[str]) -> None:
+        """Pretend to have these items (UT's /manually_collect); an empty list clears them."""
+        core = self.core
+        if core is None:
+            raise EngineError(f"{self.slot_name} isn't tracking yet.")
+        if not hasattr(core, "manual_items"):
+            raise EngineError("This version of Universal Tracker can't pretend to have items. Update Universal Tracker.")
+        world = core.get_current_world()
+        unknown = [n for n in items if n not in world.item_name_to_id]
+        if unknown:
+            raise EngineError(f"{world.game} has no item called “{unknown[0]}”.")
+        core.manual_items = list(dict.fromkeys(items))   # no duplicates, keep order
+        self._persist()
         self.watcher_event.set()
 
     async def say(self, text: str):
@@ -883,6 +919,25 @@ class Engine:
             except EngineError as e:
                 error = str(e)
             await ws.send(json.dumps({"type": "said", "req": msg.get("req"), "error": error}))
+        elif cmd == "manual":
+            ctx = self.slots.get(msg["id"])
+            error = None
+            try:
+                if ctx is None:
+                    raise EngineError("That game isn't being tracked.")
+                await ctx.set_manual([str(x) for x in msg.get("items", [])])
+            except EngineError as e:
+                error = str(e)
+            await ws.send(json.dumps({"type": "manual", "req": msg.get("req"), "error": error}))
+        elif cmd == "item_names":
+            ctx = self.slots.get(msg["id"])
+            try:
+                if ctx is None:
+                    raise EngineError("That game isn't being tracked.")
+                reply = {"names": ctx.game_item_names()}
+            except EngineError as e:
+                reply = {"names": [], "error": str(e)}
+            await ws.send(json.dumps({"type": "item_names", "req": msg.get("req"), **reply}))
         elif cmd == "clear_feed":
             self.feed.pop(msg.get("room", ""), None)
         elif cmd == "ping":

@@ -40,6 +40,7 @@ in one place, with a faster, cleaner interface.
 | ✅ **Goaled** | A finished game gets a green tick and a **GOALED** pill. If the room releases on goal, its checks are cleared and its bar fills up. |
 | 🚪 **New entrances** | Entrance randomizers that reveal entrances as you go (like Spicy Mycena 64's paintings): entrances you can reach but haven't been through yet are listed, like UT's unconnected entrances, with their own filter. |
 | 🏆 **Events** | The events the logic has reached (like UT's `/event_inventory`), in their own tab next to the items you've received. |
+| 🧪 **Pretend items** | Pretend you have an item to see what it unlocks (like UT's `/manually_collect`), with a clear warning while it's on. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`), or hide / unhide them all at once (`/ignore_all`, `/reset_ignored`). |
 | 🚫 **Excluded checks** | Checks excluded in a YAML are dimmed and tagged (or hidden, in Settings) and never count toward a game's number. |

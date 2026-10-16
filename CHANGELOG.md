@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.10.4
+
+- **Pretend you have an item** (engine v0.4.5): in the Items panel, type an item into **Pretend you have an item…**
+  (suggestions come from the game's item list) to see what it would unlock, like Universal Tracker's
+  `/manually_collect`. The logic counts pretend items as received, but they're not added to your items received. Each
+  shows as an orange chip with an × to remove it, and while any are on, the game's header shows an orange
+  **N pretend items** chip (click it to see them). Pretend items are saved per seed, like hidden checks.
+
 ## v0.10.3
 
 - **Events** (engine v0.4.4): the Items panel (the **Items** toggle) has an **Events** tab next to Items received,

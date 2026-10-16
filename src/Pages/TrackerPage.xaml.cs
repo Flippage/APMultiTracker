@@ -183,6 +183,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FGlitchedChip.Visibility = s.Glitched > 0 ? Visibility.Visible : Visibility.Collapsed;
         FHinted.Text = s.Hinted.ToString();
         FHintedChip.Visibility = s.Hinted > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FPretend.Text = s.ManualItems.Count.ToString();
+        FPretendLabel.Text = s.ManualItems.Count == 1 ? " pretend item" : " pretend items";
+        FPretendChip.Visibility = s.HasManual ? Visibility.Visible : Visibility.Collapsed;
+        FPretendChip.ToolTip = s.HasManual
+            ? "The logic is counting these as received:\n" + string.Join("\n", s.ManualItems) + "\n\nClick to see them in the Items panel."
+            : null;
         FEntrances.Text = s.Entrances.ToString();
         FEntrancesLabel.Text = s.Entrances == 1 ? " new entrance" : " new entrances";
         FEntranceChip.Visibility = s.Entrances > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -222,6 +228,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         EventsHeader.Text = $"EVENTS · {s.Events.Count}";
         ItemsList.ItemsSource = s.Items;
         EventsList.ItemsSource = s.Events;
+        PretendChips.ItemsSource = s.ManualItems;
         ApplyItemsTab(s);
         RefreshList();
     }
@@ -621,10 +628,97 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     {
         bool events = App.Config.ShowEvents;
         ItemsList.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
+        PretendArea.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         EventsList.Visibility = events ? Visibility.Visible : Visibility.Collapsed;
         EventsEmpty.Visibility = events && s.Events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ItemsHeader.Foreground = (Brush)FindResource(events ? "SubBrush" : "AccentBrush");
         EventsHeader.Foreground = (Brush)FindResource(events ? "AccentBrush" : "SubBrush");
+    }
+
+    // ------------------------------------------------------------------ pretend items (UT's /manually_collect)
+
+    private void PretendChip_Click(object sender, MouseButtonEventArgs e)
+    {
+        ItemsToggle.IsChecked = true;   // show the Items panel, on its Items tab
+        SetItemsTab(false);
+    }
+
+    private async void PretendBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        PretendError.Visibility = Visibility.Collapsed;
+        var s = _shown;
+        string q = PretendBox.Text.Trim();
+        if (s == null || q.Length == 0) { PretendPopup.IsOpen = false; return; }
+        var names = await App.Tracker.ItemNamesAsync(s);
+        if (_shown != s || PretendBox.Text.Trim() != q) return;   // moved on while waiting
+        var have = new HashSet<string>(s.ManualItems);
+        var matches = names.Where(n => !have.Contains(n) && n.Contains(q, StringComparison.OrdinalIgnoreCase))
+                           .OrderBy(n => n.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                           .ThenBy(n => n, NaturalComparer.Instance).Take(40).ToList();
+        PretendSuggest.ItemsSource = matches;
+        if (matches.Count > 0) PretendSuggest.SelectedIndex = 0;
+        PretendPopup.IsOpen = matches.Count > 0 && PretendBox.IsKeyboardFocused;
+    }
+
+    private void PretendBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Down && PretendPopup.IsOpen)
+        {
+            PretendSuggest.SelectedIndex = Math.Min(PretendSuggest.SelectedIndex + 1, PretendSuggest.Items.Count - 1);
+            PretendSuggest.ScrollIntoView(PretendSuggest.SelectedItem);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up && PretendPopup.IsOpen)
+        {
+            PretendSuggest.SelectedIndex = Math.Max(PretendSuggest.SelectedIndex - 1, 0);
+            PretendSuggest.ScrollIntoView(PretendSuggest.SelectedItem);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter)
+        {
+            // The highlighted suggestion, or exactly what was typed
+            string name = PretendPopup.IsOpen && PretendSuggest.SelectedItem is string pick ? pick : PretendBox.Text.Trim();
+            if (name.Length > 0) _ = AddPretendAsync(name);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape) { PretendPopup.IsOpen = false; e.Handled = true; }
+    }
+
+    private void PretendBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        // Clicking a suggestion moves focus into the popup: keep it open for that click.
+        if (e.NewFocus is DependencyObject d && PretendPopup.Child.IsAncestorOf(d)) return;
+        PretendPopup.IsOpen = false;
+    }
+
+    private void PretendSuggest_Click(object sender, MouseButtonEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is string name) _ = AddPretendAsync(name);
+    }
+
+    private async System.Threading.Tasks.Task AddPretendAsync(string name)
+    {
+        var s = _shown;
+        if (s == null) return;
+        PretendPopup.IsOpen = false;
+        string? error = await App.Tracker.SetManualAsync(s, s.ManualItems.Append(name));
+        if (error != null)
+        {
+            PretendError.Text = error;
+            PretendError.Visibility = Visibility.Visible;
+            return;
+        }
+        PretendError.Visibility = Visibility.Collapsed;
+        PretendBox.Text = "";
+    }
+
+    private async void PretendRemove_Click(object sender, RoutedEventArgs e)
+    {
+        var s = _shown;
+        if (s == null || (sender as FrameworkElement)?.DataContext is not string name) return;
+        string? error = await App.Tracker.SetManualAsync(s, s.ManualItems.Where(n => n != name));
+        PretendError.Text = error ?? "";
+        PretendError.Visibility = error != null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ItemsTab_Click(object sender, MouseButtonEventArgs e) => SetItemsTab(false);

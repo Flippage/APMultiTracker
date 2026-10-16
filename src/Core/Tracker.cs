@@ -146,6 +146,11 @@ public sealed class SlotView : INotifyPropertyChanged
     public IReadOnlyList<CheckItem> Locations { get; private set; } = Array.Empty<CheckItem>();
     public IReadOnlyList<ItemCount> Items { get; private set; } = Array.Empty<ItemCount>();
     public IReadOnlyList<EventItem> Events { get; private set; } = Array.Empty<EventItem>();
+    /// <summary>Items we're pretending to have (UT's /manually_collect): the logic counts them as received.</summary>
+    public IReadOnlyList<string> ManualItems { get; private set; } = Array.Empty<string>();
+    public bool HasManual => ManualItems.Count > 0;
+    /// <summary>The game's item names, fetched once for the "Pretend you have…" suggestions.</summary>
+    public IReadOnlyList<string>? ItemNames { get; set; }
     public IReadOnlyList<string> Errors { get; private set; } = Array.Empty<string>();
     public bool HasData { get; private set; }
 
@@ -188,6 +193,7 @@ public sealed class SlotView : INotifyPropertyChanged
     public string InLogicTip => IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete"
                               : Entrances > 0 ? $"{InLogic} {(InLogic == 1 ? "check" : "checks")} in logic + {Entrances} new {(Entrances == 1 ? "entrance" : "entrances")}"
                               : "Checks in logic";
+    public string ToDoTip => HasManual ? InLogicTip + $" (pretending to have {ManualItems.Count} {(ManualItems.Count == 1 ? "item" : "items")})" : InLogicTip;
     public bool IsDone => HasData && Total > 0 && Checked >= Total;
     public bool IsGoMode => GoMode == "yes";
     /// <summary>Show the go mode pill: the goal can be reached now (in logic, or with glitches), like UT's "Go mode"
@@ -252,6 +258,8 @@ public sealed class SlotView : INotifyPropertyChanged
         Hidden = (int)Json.Long(m["ignored"]);
         GoMode = m["go_mode"]?.GetValue<string>() ?? "no";
         Goal = m["goal"]?.GetValue<bool>() ?? false;
+        ManualItems = (m["manual_items"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0).ToList()
+                      ?? new List<string>();
         AutoRelease = m["auto_release"]?.GetValue<bool>() ?? false;
         Warning = m["warning"]?.GetValue<string>() ?? "";
 
@@ -544,6 +552,12 @@ public sealed class TrackerStore
         if (slot != null) return _engine.Client.RefreshAsync(slot.Ref.Id);
         return System.Threading.Tasks.Task.WhenAll(Slots.Select(s => _engine.Client.RefreshAsync(s.Ref.Id)));
     }
+
+    public System.Threading.Tasks.Task<string?> SetManualAsync(SlotView slot, IEnumerable<string> items) =>
+        _engine.Client.SetManualAsync(slot.Ref.Id, items);
+
+    public async System.Threading.Tasks.Task<IReadOnlyList<string>> ItemNamesAsync(SlotView slot) =>
+        slot.ItemNames is { Count: > 0 } cached ? cached : slot.ItemNames = await _engine.Client.ItemNamesAsync(slot.Ref.Id);
 
     public System.Threading.Tasks.Task SetHiddenAsync(SlotView slot, IEnumerable<long> ids, bool hidden) =>
         _engine.Client.SetIgnoredAsync(slot.Ref.Id, ids.ToArray(), hidden);

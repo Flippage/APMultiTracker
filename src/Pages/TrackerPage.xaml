@@ -157,7 +157,7 @@
                 <DockPanel Margin="0,0,0,3">
                     <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left" VerticalAlignment="Center"
                             Margin="0,0,9,0" Visibility="{Binding DataContext.TileArtVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
-                    <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,2,0" ToolTip="{Binding InLogicTip}">
+                    <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,2,0" ToolTip="{Binding ToDoTip}">
                         <!-- Bottom margin: the digits sit low in their line box, this centres them on the art -->
                         <TextBlock x:Name="Count" Text="{Binding InLogicText}" FontSize="20" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
                                    Margin="0,0,0,4" HorizontalAlignment="Right"/>
@@ -338,7 +338,7 @@
                                         ToolTip="Focus this game">
                                     <DockPanel Margin="0,0,6,10">
                                         <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
-                                        <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip="{Binding InLogicTip}">
+                                        <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip="{Binding ToDoTip}">
                                             <TextBlock Text="{Binding InLogicText}" FontSize="22" FontWeight="Bold" Foreground="{Binding InLogicBrush}"
                                                        Margin="0,0,0,4" Visibility="{Binding ShowCount, Converter={StaticResource Vis}}"/>
                                             <Viewbox Width="21" Height="21" Visibility="{Binding Goal, Converter={StaticResource Vis}}">
@@ -478,6 +478,12 @@
                             <Border x:Name="FHintedChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource HintDimBrush}">
                                 <TextBlock FontSize="12.5" Foreground="{StaticResource HintBrush}">
                                     <Run x:Name="FHinted" FontWeight="Bold" FontSize="14"/><Run Text=" hinted"/>
+                                </TextBlock>
+                            </Border>
+                            <Border x:Name="FPretendChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource PretendDimBrush}"
+                                    BorderBrush="{StaticResource PretendBrush}" BorderThickness="1" Cursor="Hand" MouseLeftButtonUp="PretendChip_Click">
+                                <TextBlock FontSize="12.5" Foreground="{StaticResource PretendBrush}">
+                                    <Run x:Name="FPretend" FontWeight="Bold" FontSize="14"/><Run x:Name="FPretendLabel"/>
                                 </TextBlock>
                             </Border>
                             <Border x:Name="FEntranceChip" CornerRadius="8" Padding="10,5" Margin="0,0,8,6" Background="{StaticResource EntranceDimBrush}"
@@ -672,6 +678,48 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        <!-- Pretend you have an item (UT's /manually_collect) -->
+                        <StackPanel x:Name="PretendArea" DockPanel.Dock="Top" Margin="2,0,10,8">
+                            <Grid>
+                                <TextBox x:Name="PretendBox" Style="{StaticResource Field}" MinHeight="32" Height="32" FontSize="12.5" Padding="10,0"
+                                         Tag="Pretend you have an item…" TextChanged="PretendBox_TextChanged" PreviewKeyDown="PretendBox_KeyDown"
+                                         LostKeyboardFocus="PretendBox_LostFocus"
+                                         ToolTip="See what an item would unlock: the logic counts it as received (like UT's /manually_collect)"/>
+                                <Popup x:Name="PretendPopup" PlacementTarget="{Binding ElementName=PretendBox}" Placement="Bottom" StaysOpen="True"
+                                       AllowsTransparency="True" Width="{Binding ActualWidth, ElementName=PretendBox}">
+                                    <Border Background="#1A1A1A" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" Padding="4">
+                                        <ListBox x:Name="PretendSuggest" Style="{StaticResource CheckList}" Background="Transparent" MaxHeight="240"
+                                                 PreviewMouseLeftButtonUp="PretendSuggest_Click">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                            <TextBlock x:Name="PretendError" Style="{StaticResource Sub}" Foreground="{StaticResource DangerBrush}" Margin="2,4,0,0"
+                                       TextWrapping="Wrap" Visibility="Collapsed"/>
+                            <ItemsControl x:Name="PretendChips" Margin="0,6,0,0" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="6" Padding="8,2,3,3" Margin="0,0,6,6" Background="{StaticResource PretendDimBrush}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding}" FontSize="12" Foreground="{StaticResource PretendBrush}" VerticalAlignment="Center"/>
+                                                <Button Style="{StaticResource IconButton}" Width="20" Height="20" Margin="4,0,0,0" Tag="{StaticResource IconClose}"
+                                                        ToolTip="Stop pretending" Click="PretendRemove_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                         <ListBox x:Name="ItemsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:ItemCount}">

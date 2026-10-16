@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
@@ -158,6 +160,24 @@ public sealed class EngineClient
         var arr = new JsonArray();
         foreach (var l in locations) arr.Add(l);
         return SendAsync(new JsonObject { ["cmd"] = "ignore", ["id"] = id, ["locations"] = arr, ["ignored"] = ignored });
+    }
+
+    /// <summary>Pretend to have these items (UT's /manually_collect); empty clears. Returns an error or null.</summary>
+    public async Task<string?> SetManualAsync(string id, IEnumerable<string> items)
+    {
+        var arr = new JsonArray();
+        foreach (var i in items) arr.Add(i);
+        var reply = await RequestAsync(new JsonObject { ["cmd"] = "manual", ["id"] = id, ["items"] = arr }, TimeSpan.FromSeconds(10));
+        if (reply == null) return "No answer from the engine.";
+        return reply["error"]?.GetValue<string>();
+    }
+
+    /// <summary>Every item name in a tracked slot's game (for suggestions).</summary>
+    public async Task<IReadOnlyList<string>> ItemNamesAsync(string id)
+    {
+        var reply = await RequestAsync(new JsonObject { ["cmd"] = "item_names", ["id"] = id }, TimeSpan.FromSeconds(10));
+        return (reply?["names"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0).ToList()
+               ?? new List<string>();
     }
 
     public Task ShutdownAsync() => SendAsync(new JsonObject { ["cmd"] = "shutdown" });

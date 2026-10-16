@@ -36,6 +36,8 @@
     <SolidColorBrush x:Key="InLogicDimBrush" Color="#10291A"/>
     <SolidColorBrush x:Key="GlitchedBrush" Color="#FBBF24"/>
     <SolidColorBrush x:Key="EntranceBrush" Color="#89F336"/>
+    <SolidColorBrush x:Key="PretendBrush" Color="#FB923C"/>
+    <SolidColorBrush x:Key="PretendDimBrush" Color="#2B1A0C"/>
     <SolidColorBrush x:Key="EntranceDimBrush" Color="#1C2A0C"/>
     <SolidColorBrush x:Key="OutLogicBrush" Color="#6B6B6B"/>
     <SolidColorBrush x:Key="HintBrush" Color="#C084FC"/>
