@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.2
+
+- **Hide or unhide everything at once**: right-click the check list for **Hide all in-logic checks…** (like Universal
+  Tracker's `/ignore_all`) or **Unhide all hidden checks…** (like `/reset_ignored`). With the **Hidden** filter on, an
+  **Unhide all** button does the same. Both ask first, and hidden checks stay hidden after a restart.
+
 ## v0.10.1
 
 - **Excluded checks** (engine v0.4.3): checks excluded in a player's YAML (they only ever hold filler) are shown

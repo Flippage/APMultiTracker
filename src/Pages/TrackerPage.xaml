@@ -550,6 +550,9 @@
                                  ToolTip="Entrances you can reach but haven't been through yet" Visibility="Collapsed">New entrances</RadioButton>
                     <RadioButton x:Name="FHiddenPill" Style="{StaticResource FilterPill}" GroupName="Filter" Checked="Filter_Checked" Tag="Hidden"
                                  ToolTip="Checks you've hidden">Hidden</RadioButton>
+                    <!-- With the Hidden filter on: bring them all back -->
+                    <Button x:Name="UnhideAllBtn" Style="{StaticResource OutlineButton}" Height="32" Padding="14,0" FontSize="12.5"
+                            Margin="6,0,0,0" VerticalAlignment="Center" Content="Unhide all" Visibility="Collapsed" Click="CtxUnhideAll_Click"/>
                 </WrapPanel>
             </DockPanel>
 
@@ -590,6 +593,8 @@
                             <MenuItem Header="Show logical path" Click="CtxPath_Click"/>
                             <Separator/>
                             <MenuItem x:Name="CtxHide" Header="Hide / show this check" Click="CtxHide_Click"/>
+                            <MenuItem Header="Hide all in-logic checks…" Click="CtxHideAll_Click"/>
+                            <MenuItem Header="Unhide all hidden checks…" Click="CtxUnhideAll_Click"/>
                             <MenuItem Header="Copy name" Click="CtxCopy_Click"/>
                         </ContextMenu>
                     </ListBox.ContextMenu>

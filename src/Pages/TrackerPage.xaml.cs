@@ -198,6 +198,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FGoChip.Background = (Brush)FindResource(s.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
         FGoChip.BorderBrush = FGo.Foreground = (Brush)FindResource(s.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
         FHiddenPill.Content = s.Hidden > 0 ? $"Hidden ({s.Hidden})" : "Hidden";
+        UnhideAllBtn.Visibility = App.Config.Filter == CheckFilter.Hidden && s.Hidden > 0 ? Visibility.Visible : Visibility.Collapsed;
         FHintPill.Content = s.Hinted > 0 ? $"Hinted ({s.Hinted})" : "Hinted";
         FEntrancePill.Content = s.Entrances > 0 ? $"New entrances ({s.Entrances})" : "New entrances";
         // Only for games that have some (or while it's the chosen filter, so it doesn't vanish under you)
@@ -549,6 +550,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         if (_syncing || sender is not RadioButton { Tag: string tag } || !Enum.TryParse<CheckFilter>(tag, out var f)) return;
         App.Config.Filter = f;
         App.SaveConfig();
+        if (_shown != null)
+            UnhideAllBtn.Visibility = f == CheckFilter.Hidden && _shown.Hidden > 0 ? Visibility.Visible : Visibility.Collapsed;
         RefreshList();
     }
 
@@ -579,6 +582,34 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     {
         if (_shown == null || CheckListBox.SelectedItem is not CheckItem c || c.IsEntrance) return;
         await App.Tracker.SetHiddenAsync(_shown, new[] { c.Id }, !c.IsHidden);
+    }
+
+    /// <summary>Like UT's /ignore_all: hide every check that's in logic right now (new entrances aren't checks).</summary>
+    private async void CtxHideAll_Click(object sender, RoutedEventArgs e)
+    {
+        var s = _shown;
+        if (s == null) return;
+        var ids = s.Locations.Where(l => l.IsInLogic && l.Id > 0).Select(l => l.Id).ToList();
+        if (ids.Count == 0) return;
+        if (Window.GetWindow(this) is not MainWindow w) return;
+        string what = ids.Count == 1 ? "1 check" : $"{ids.Count} checks";
+        if (!await w.ConfirmAsync($"Hide {what}?",
+                $"Hides every check that's in logic for {s.SlotName} ({s.Title}). Find them under the Hidden filter, where you can unhide them again.",
+                "Hide all")) return;
+        if (_shown == s) await App.Tracker.SetHiddenAsync(s, ids, true);
+    }
+
+    /// <summary>Like UT's /reset_ignored: show every hidden check again.</summary>
+    private async void CtxUnhideAll_Click(object sender, RoutedEventArgs e)
+    {
+        var s = _shown;
+        if (s == null) return;
+        var ids = s.Locations.Where(l => l.IsHidden).Select(l => l.Id).ToList();
+        if (ids.Count == 0) return;
+        if (Window.GetWindow(this) is not MainWindow w) return;
+        string what = ids.Count == 1 ? "1 hidden check" : $"{ids.Count} hidden checks";
+        if (!await w.ConfirmAsync($"Unhide {what}?", $"Shows every check you've hidden for {s.SlotName} ({s.Title}) again.", "Unhide all")) return;
+        if (_shown == s) await App.Tracker.SetHiddenAsync(s, ids, false);
     }
 
     private void CtxCopy_Click(object sender, RoutedEventArgs e)
