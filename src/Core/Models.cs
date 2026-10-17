@@ -61,8 +61,13 @@ public sealed class AppConfig
     public bool WindowMaximized { get; set; }
     public string LastPage { get; set; } = "Tracker";
     public bool ShowItems { get; set; }
+    /// <summary>The Hints panel (hint points, buy a hint, hint lists).</summary>
+    public bool ShowHints { get; set; }
+    public bool ShowFoundHints { get; set; }
     /// <summary>The Items panel's tab: received items, or events (UT's /event_inventory).</summary>
     public bool ShowEvents { get; set; }
+    /// <summary>Items received: newest first instead of A-Z.</summary>
+    public bool ItemsLatestFirst { get; set; }
     public bool ShowExplain { get; set; }
 
     // ---- app

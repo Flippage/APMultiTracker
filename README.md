@@ -42,7 +42,7 @@ in one place, with a faster, cleaner interface.
 | 🏆 **Events** | The events the logic has reached (like UT's `/event_inventory`), in their own tab next to the items you've received. |
 | 🧪 **Pretend items** | Pretend you have an item to see what it unlocks (like UT's `/manually_collect`), with a clear warning while it's on. |
 | 🔔 **GO MODE alerts** | A Windows notification (or an in-app banner) and a jingle when one of your games enters go mode. Volume, your own sound, or off, in Settings. |
-| 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
+| 💡 **Hints** | Hinted checks are marked with the item and who it's for. The **Hints** panel shows your hint points and the cost, lets you buy a hint for any of your items (or right-click a check to hint that location), and lists every hint for the game. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`), or hide / unhide them all at once (`/ignore_all`, `/reset_ignored`). |
 | 🚫 **Excluded checks** | Checks excluded in a YAML are dimmed and tagged (or hidden, in Settings) and never count toward a game's number. |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |

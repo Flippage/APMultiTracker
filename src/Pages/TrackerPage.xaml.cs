@@ -42,6 +42,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     public TrackerPage()
     {
         InitializeComponent();
+        LayoutUpdated += (_, _) => PlaceTallSide();   // keep a lifted Items / Hints column lined up with the check list
         DataContext = this;
         _view = new ListCollectionView(_checks);
         CheckListBox.ItemsSource = _view;
@@ -74,6 +75,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         OverviewGroupToggle.IsChecked = App.Config.OverviewGroupByRegion;
         ItemsToggle.IsChecked = App.Config.ShowItems;
         ExplainToggle.IsChecked = App.Config.ShowExplain;
+        HintsToggle.IsChecked = App.Config.ShowHints;
+        FoundHintsToggle.IsChecked = App.Config.ShowFoundHints;
         (App.Config.Filter switch
         {
             CheckFilter.Reachable => FReachPill,
@@ -121,6 +124,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
         OverviewView.Visibility = hasGames && focused == null ? Visibility.Visible : Visibility.Collapsed;
         FocusView.Visibility = hasGames && focused != null ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSideLayout();
         if (focused != _shown)
         {
             _shown = focused;
@@ -226,9 +230,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
         ItemsHeader.Text = $"ITEMS RECEIVED · {s.Items.Sum(i => i.Count)}";
         EventsHeader.Text = $"EVENTS · {s.Events.Count}";
-        ItemsList.ItemsSource = s.Items;
+        ItemsList.ItemsSource = SortedItems(s);
         EventsList.ItemsSource = s.Events;
         PretendChips.ItemsSource = s.ManualItems;
+        RefreshHints(s);
         ApplyItemsTab(s);
         RefreshList();
     }
@@ -419,6 +424,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         }
         DockedFeed.SetDockPosition(right ? "Right" : "Bottom");
         ClampFeedDock();
+        UpdateSideLayout();
 
         var accent = (Brush)FindResource("AccentBrush");
         var normal = (Brush)FindResource("Text2Brush");
@@ -427,6 +433,58 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FeedBtnIcon.Stroke = on ? accent : normal;
         FeedBtnText.Foreground = on ? accent : normal;
         FeedBtn.ToolTip = on ? "Hide the feed" : "Show the feed next to the tracker";
+    }
+
+    // ------------------------------------------------------------------ Items / Hints column next to a bottom feed
+
+    private bool _sideTall;
+
+    /// <summary>
+    /// With the feed along the bottom, the Items / Hints column runs from the top of the check list to the bottom of the
+    /// window (the feed stops beside it): hint lists need the height more than the feed needs the width.
+    /// </summary>
+    private void UpdateSideLayout()
+    {
+        bool sideOn = ItemsPanel.Visibility == Visibility.Visible || HintsPanel.Visibility == Visibility.Visible;
+        bool tall = App.Config.ShowFeedInTracker && App.Config.FeedDock == "Bottom" && sideOn
+                    && FocusView.Visibility == Visibility.Visible;
+        if (tall != _sideTall)
+        {
+            _sideTall = tall;
+            if (SidePanels.Parent is Panel from) from.Children.Remove(SidePanels);
+            if (tall)
+            {
+                Grid.SetColumn(SidePanels, 0); Grid.SetColumnSpan(SidePanels, 3);
+                Grid.SetRow(SidePanels, 0); Grid.SetRowSpan(SidePanels, 3);
+                SidePanels.HorizontalAlignment = HorizontalAlignment.Right;
+                SidePanels.VerticalAlignment = VerticalAlignment.Stretch;
+                DockRoot.Children.Add(SidePanels);
+            }
+            else
+            {
+                Grid.SetColumn(SidePanels, 1); Grid.SetColumnSpan(SidePanels, 1);
+                Grid.SetRow(SidePanels, 0); Grid.SetRowSpan(SidePanels, 3);
+                SidePanels.HorizontalAlignment = HorizontalAlignment.Stretch;
+                SidePanels.Width = double.NaN;
+                SidePanels.Margin = new Thickness(0);
+                FocusBody.Children.Add(SidePanels);
+            }
+        }
+        double width = ItemsCol.Width.Value;   // the column stays reserved in the focused view
+        FeedDock.Margin = new Thickness(32, 0, tall ? 32 + width : 32, 20);
+        FeedHSplit.Margin = new Thickness(0, 0, tall ? 32 + width : 0, 0);
+        if (tall) PlaceTallSide();
+    }
+
+    /// <summary>Lines the lifted column up with the check list's top (and the window's right / bottom margins).</summary>
+    private void PlaceTallSide()
+    {
+        if (!_sideTall || !FocusBody.IsVisible) return;
+        double top = FocusBody.TranslatePoint(new Point(0, 0), DockRoot).Y;
+        double width = ItemsCol.Width.Value;
+        var m = new Thickness(0, top, 32, 20);
+        if (SidePanels.Margin != m) SidePanels.Margin = m;
+        if (Math.Abs(SidePanels.Width - width) > 0.5 || double.IsNaN(SidePanels.Width)) SidePanels.Width = width;
     }
 
     /// <summary>Self-test: the docked feed is on screen with a usable size.</summary>
@@ -461,6 +519,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         Search.Width = double.NaN;
         if (Search.Parent is FrameworkElement box) box.Width = narrow ? 170 : 240;
         GroupToggle.Content = narrow ? "Regions" : "Group by region";
+        // Four toggles in one row squeeze the header when narrow: two rows of two instead.
+        ViewToggles.MaxWidth = narrow ? 250 : double.PositiveInfinity;
+        foreach (var t in new FrameworkElement[] { GroupToggle, ItemsToggle, HintsToggle, ExplainToggle })
+            t.Margin = narrow ? new Thickness(14, 2, 0, 2) : new Thickness(t == GroupToggle ? 0 : 18, 0, 0, 0);
         FeedBtnText.Visibility = w > 0 && w < 700 ? Visibility.Collapsed : Visibility.Visible;
         FArtBox.Visibility = compact || (w > 0 && w < 640) ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -504,8 +566,16 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ExplainRow.MinHeight = explain ? 120 : 0;
         ExplainRow.Height = new GridLength(explain ? App.Config.ExplainHeight : 0);
         FitExplainHeight();
-        ItemsCol.Width = ItemsToggle.IsChecked == true ? new GridLength(280) : new GridLength(0);
-        ItemsPanel.Visibility = ItemsToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        // Right-hand column: Items and/or Hints, stacked when both are on.
+        bool items = ItemsToggle.IsChecked == true, hints = HintsToggle.IsChecked == true;
+        ItemsCol.Width = new GridLength(hints ? 330 : items ? 280 : 0);
+        ItemsPanel.Visibility = items ? Visibility.Visible : Visibility.Collapsed;
+        HintsPanel.Visibility = hints ? Visibility.Visible : Visibility.Collapsed;
+        ItemsRow.Height = items ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        HintsRow.Height = hints ? new GridLength(items ? 1.4 : 1, GridUnitType.Star) : new GridLength(0);
+        HintsPanel.Margin = new Thickness(10, items && hints ? 10 : 0, 0, 0);
+        if (hints && _shown != null) _ = LoadHintItemsAsync(_shown, refresh: false);
+        UpdateSideLayout();
     }
 
     private void UpdateBanner()
@@ -571,6 +641,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Config.GroupByRegion = GroupToggle.IsChecked == true;
         App.Config.ShowItems = ItemsToggle.IsChecked == true;
         App.Config.ShowExplain = ExplainToggle.IsChecked == true;
+        App.Config.ShowHints = HintsToggle.IsChecked == true;
         App.SaveConfig();
         ApplyGrouping();
         RefreshList();
@@ -629,10 +700,189 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         bool events = App.Config.ShowEvents;
         ItemsList.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         PretendArea.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
+        ItemsSortBtn.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
+        ItemsSortBtn.Text = App.Config.ItemsLatestFirst ? "Latest first ▾" : "A–Z ▾";
         EventsList.Visibility = events ? Visibility.Visible : Visibility.Collapsed;
         EventsEmpty.Visibility = events && s.Events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ItemsHeader.Foreground = (Brush)FindResource(events ? "SubBrush" : "AccentBrush");
         EventsHeader.Foreground = (Brush)FindResource(events ? "AccentBrush" : "SubBrush");
+    }
+
+    // ------------------------------------------------------------------ hints: points, buy a hint, hint lists
+
+    private HintItem? _hintPick;
+    private SlotView? _hintSlot;
+
+    private void RefreshHints(SlotView s)
+    {
+        if (_hintSlot != s)
+        {
+            // Another game: start the picker over.
+            _hintSlot = s;
+            _hintPick = null;
+            HintBox.Text = "";
+            HintResultBox.Visibility = Visibility.Collapsed;
+            if (HintsToggle.IsChecked == true) _ = LoadHintItemsAsync(s, refresh: false);
+        }
+        HintPointsText.Text = s.HintCost > 0 ? $"{s.HintPoints} points · {s.HintCost} per hint" : $"{s.HintPoints} points";
+        HintAffordText.Text = !s.HasData ? ""
+            : s.HintCost == 0 ? "Hints are free in this room."
+            : s.HintPoints >= s.HintCost ? $"You can buy {s.HintPoints / s.HintCost} {(s.HintPoints / s.HintCost == 1 ? "hint" : "hints")}. Re-showing a hint you already have is free."
+            : $"You need {s.HintCost - s.HintPoints} more points for a hint. You get points for checking locations.";
+        bool showFound = App.Config.ShowFoundHints;
+        var mine = s.Hints.Where(h => h.Mine && (showFound || !h.Found)).ToList();
+        var theirs = s.Hints.Where(h => !h.Mine && h.InMyWorld && (showFound || !h.Found)).ToList();
+        HintsMine.ItemsSource = mine;
+        HintsTheirs.ItemsSource = theirs;
+        HintsMineHeader.Text = $"WHERE YOUR ITEMS ARE · {mine.Count}";
+        HintsTheirsHeader.Text = $"OTHERS' ITEMS IN YOUR WORLD · {theirs.Count}";
+        UpdateHintButton();
+        CtxHint.Header = s.HintCost > 0 ? $"Hint this location · {s.HintCost} points" : "Hint this location";
+        CtxHint.IsEnabled = s.IsTracking && (s.HintCost == 0 || s.HintPoints >= s.HintCost);
+    }
+
+    private async System.Threading.Tasks.Task LoadHintItemsAsync(SlotView s, bool refresh)
+    {
+        if (!s.IsTracking) return;
+        await App.Tracker.HintItemsAsync(s, refresh);
+        if (_shown == s && _hintPick != null)
+            _hintPick = s.HintItems?.FirstOrDefault(i => i.Name == _hintPick.Name) ?? _hintPick;   // fresh counts / hinted state
+        UpdateHintButton();
+    }
+
+    private void UpdateHintButton()
+    {
+        var s = _shown;
+        var pick = _hintPick;
+        if (s == null || pick == null)
+        {
+            HintBuyBtn.IsEnabled = false;
+            HintBuyBtn.Content = "Pick an item to hint";
+            return;
+        }
+        bool free = pick.Hinted || s.HintCost == 0;
+        bool afford = free || s.HintPoints >= s.HintCost;
+        HintBuyBtn.IsEnabled = afford && s.IsTracking;
+        HintBuyBtn.Content = pick.Hinted ? "Show this hint again · free"
+                           : s.HintCost == 0 ? "Get hint · free"
+                           : afford ? $"Buy hint · {s.HintCost} points"
+                           : $"Need {s.HintCost} points (you have {s.HintPoints})";
+    }
+
+    private async void HintBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var s = _shown;
+        string q = HintBox.Text.Trim();
+        if (_hintPick != null && q != _hintPick.Name) { _hintPick = null; UpdateHintButton(); }
+        if (_hintPick != null && !_hintShowAll) return;   // the box just got the picked name
+        if (s == null || (!HintBox.IsKeyboardFocused && !_hintShowAll)) return;
+        var items = await App.Tracker.HintItemsAsync(s);
+        if (_shown != s || HintBox.Text.Trim() != q) return;
+        // Every item in the game (typing filters): names that start with the text first, then the rest by name.
+        if (_hintPick != null && q == _hintPick.Name) q = "";   // reopening after a pick shows the whole list
+        var matches = items.Where(i => q.Length == 0 || i.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+                           .OrderBy(i => q.Length > 0 && i.Name.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                           .ThenBy(i => i.Name, NaturalComparer.Instance).ToList();
+        HintSuggest.ItemsSource = matches;
+        if (matches.Count > 0) HintSuggest.SelectedIndex = 0;
+        HintPopup.IsOpen = matches.Count > 0 && (_hintPick == null || _hintShowAll);
+        _hintShowAll = false;
+    }
+
+    private void HintBox_GotFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (_hintPick == null) HintBox_TextChanged(sender, null!);   // show the list straight away
+    }
+
+    private void HintBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Down && HintPopup.IsOpen)
+        {
+            HintSuggest.SelectedIndex = Math.Min(HintSuggest.SelectedIndex + 1, HintSuggest.Items.Count - 1);
+            HintSuggest.ScrollIntoView(HintSuggest.SelectedItem);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up && HintPopup.IsOpen)
+        {
+            HintSuggest.SelectedIndex = Math.Max(HintSuggest.SelectedIndex - 1, 0);
+            HintSuggest.ScrollIntoView(HintSuggest.SelectedItem);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter)
+        {
+            if (HintPopup.IsOpen && HintSuggest.SelectedItem is HintItem pick) PickHintItem(pick);
+            else if (_hintPick != null && HintBuyBtn.IsEnabled) HintBuy_Click(sender, e);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape) { HintPopup.IsOpen = false; e.Handled = true; }
+    }
+
+    private void HintBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (e.NewFocus is DependencyObject d && (HintPopup.IsAncestorOf(d) || HintBoxRow.IsAncestorOf(d))) return;
+        HintPopup.IsOpen = false;
+    }
+
+    private bool _hintShowAll;
+
+    /// <summary>The ▾ next to the box: open (or close) the full list to scroll through.</summary>
+    private void HintArrow_Click(object sender, RoutedEventArgs e)
+    {
+        if (HintPopup.IsOpen) { HintPopup.IsOpen = false; return; }
+        _hintShowAll = true;
+        HintBox.Focus();
+        HintBox_TextChanged(HintBox, null!);
+    }
+
+    private void HintSuggest_Click(object sender, MouseButtonEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is HintItem pick) PickHintItem(pick);
+    }
+
+    private void PickHintItem(HintItem pick)
+    {
+        _hintPick = pick;
+        HintPopup.IsOpen = false;
+        HintBox.Text = pick.Name;
+        HintBox.CaretIndex = pick.Name.Length;
+        UpdateHintButton();
+    }
+
+    private async void HintBuy_Click(object sender, RoutedEventArgs e)
+    {
+        var s = _shown;
+        if (s == null || _hintPick == null) return;
+        await BuyHintAsync(s, "item", _hintPick.Name);
+    }
+
+    private async System.Threading.Tasks.Task BuyHintAsync(SlotView s, string kind, string name)
+    {
+        HintBuyBtn.IsEnabled = false;
+        HintResult.ItemsSource = new[] { new[] { new FeedSegment(kind == "location" ? $"Asking what's at {name}…" : $"Asking where {name} is…", "") } };
+        HintResultBox.Visibility = Visibility.Visible;
+        var (lines, error) = await App.Tracker.BuyHintAsync(s, kind, name);
+        if (_shown != s) return;
+        HintResult.ItemsSource = error != null ? new[] { new[] { new FeedSegment(error, "red") } }
+                               : lines.Count > 0 ? lines
+                               : new[] { new[] { new FeedSegment("No answer from the server yet. Check the feed.", "") } };
+        await LoadHintItemsAsync(s, refresh: true);
+    }
+
+    private void FoundHints_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncing) return;
+        App.Config.ShowFoundHints = FoundHintsToggle.IsChecked == true;
+        App.SaveConfig();
+        if (_shown != null) RefreshHints(_shown);
+    }
+
+    /// <summary>Right-click → Hint this location (UT's !hint_location): shows the result in the Hints panel.</summary>
+    private async void CtxHint_Click(object sender, RoutedEventArgs e)
+    {
+        var s = _shown;
+        if (s == null || CheckListBox.SelectedItem is not CheckItem c || c.IsEntrance) return;
+        HintsToggle.IsChecked = true;   // show the answer
+        await BuyHintAsync(s, "location", c.LookupName);
     }
 
     // ------------------------------------------------------------------ pretend items (UT's /manually_collect)
@@ -648,16 +898,19 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         PretendError.Visibility = Visibility.Collapsed;
         var s = _shown;
         string q = PretendBox.Text.Trim();
-        if (s == null || q.Length == 0) { PretendPopup.IsOpen = false; return; }
+        bool all = _pretendShowAll;
+        _pretendShowAll = false;
+        if (s == null || _pretendClearing) { PretendPopup.IsOpen = false; return; }
+        if (!PretendBox.IsKeyboardFocused && !all) return;   // like Where is my item?: the list goes with the box
         var names = await App.Tracker.ItemNamesAsync(s);
         if (_shown != s || PretendBox.Text.Trim() != q) return;   // moved on while waiting
         var have = new HashSet<string>(s.ManualItems);
         var matches = names.Where(n => !have.Contains(n) && n.Contains(q, StringComparison.OrdinalIgnoreCase))
                            .OrderBy(n => n.StartsWith(q, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                           .ThenBy(n => n, NaturalComparer.Instance).Take(40).ToList();
+                           .ThenBy(n => n, NaturalComparer.Instance).ToList();
         PretendSuggest.ItemsSource = matches;
         if (matches.Count > 0) PretendSuggest.SelectedIndex = 0;
-        PretendPopup.IsOpen = matches.Count > 0 && PretendBox.IsKeyboardFocused;
+        PretendPopup.IsOpen = matches.Count > 0 && (PretendBox.IsKeyboardFocused || all);
     }
 
     private void PretendBox_KeyDown(object sender, KeyEventArgs e)
@@ -687,8 +940,22 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void PretendBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         // Clicking a suggestion moves focus into the popup: keep it open for that click.
-        if (e.NewFocus is DependencyObject d && PretendPopup.Child.IsAncestorOf(d)) return;
+        if (e.NewFocus is DependencyObject d && (PretendPopup.IsAncestorOf(d) || PretendBoxRow.IsAncestorOf(d))) return;
         PretendPopup.IsOpen = false;
+    }
+
+    private bool _pretendShowAll, _pretendClearing;
+
+    /// <summary>Clicking into the box opens the full list straight away (typing then filters it).</summary>
+    private void PretendBox_GotFocus(object sender, KeyboardFocusChangedEventArgs e) => PretendBox_TextChanged(PretendBox, null!);
+
+    /// <summary>The ▾ next to the box: open (or close) the full item list to scroll through.</summary>
+    private void PretendArrow_Click(object sender, RoutedEventArgs e)
+    {
+        if (PretendPopup.IsOpen) { PretendPopup.IsOpen = false; return; }
+        _pretendShowAll = true;
+        PretendBox.Focus();
+        PretendBox_TextChanged(PretendBox, null!);
     }
 
     private void PretendSuggest_Click(object sender, MouseButtonEventArgs e)
@@ -709,7 +976,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             return;
         }
         PretendError.Visibility = Visibility.Collapsed;
+        _pretendClearing = true;   // clearing the box after adding shouldn't pop the list back open
         PretendBox.Text = "";
+        _pretendClearing = false;
     }
 
     private async void PretendRemove_Click(object sender, RoutedEventArgs e)
@@ -719,6 +988,20 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         string? error = await App.Tracker.SetManualAsync(s, s.ManualItems.Where(n => n != name));
         PretendError.Text = error ?? "";
         PretendError.Visibility = error != null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>A-Z (progression items first), or newest first.</summary>
+    private static IReadOnlyList<ItemCount> SortedItems(SlotView s) => App.Config.ItemsLatestFirst
+        ? s.Items.OrderByDescending(i => i.Last).ThenBy(i => i.Name, NaturalComparer.Instance).ToList()
+        : s.Items;
+
+    private void ItemsSort_Click(object sender, MouseButtonEventArgs e)
+    {
+        App.Config.ItemsLatestFirst = !App.Config.ItemsLatestFirst;
+        App.SaveConfig();
+        if (_shown == null) return;
+        ItemsList.ItemsSource = SortedItems(_shown);
+        ApplyItemsTab(_shown);
     }
 
     private void ItemsTab_Click(object sender, MouseButtonEventArgs e) => SetItemsTab(false);
@@ -798,7 +1081,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                 return;
             }
             if (reply?["lines"] is not JsonArray lines) { ShowExplain("No answer from the engine.", "red"); return; }
-            if (lines.Count == 0) { ShowExplain("Universal Tracker had nothing to say about that.", null); return; }
+            if (lines.Count == 0) { ShowExplain("There's no explanation for that.", null); return; }
             try { RenderExplain(mode, query, lines); }
             catch (Exception ex)
             {
@@ -939,13 +1222,64 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ExplainToggle.IsChecked = true;
         ShowExplain("Self-test", "green");
         UpdateLayout();
+        // A clicked button keeps keyboard focus: that must not resize it or recolour its border (it once did).
+        double explainW = ExplainBtn.ActualWidth, pathW = PathBtn.ActualWidth;
+        var pathBorder = (PathBtn.Template.FindName("Bd", PathBtn) as Border)?.BorderBrush;
+        ExplainBtn.Focus(); UpdateLayout();
+        if (Math.Abs(ExplainBtn.ActualWidth - explainW) > 0.5) throw new InvalidOperationException("A focused button changed size.");
+        PathBtn.Focus(); UpdateLayout();
+        if (Math.Abs(PathBtn.ActualWidth - pathW) > 0.5) throw new InvalidOperationException("A focused button changed size.");
+        if ((PathBtn.Template.FindName("Bd", PathBtn) as Border)?.BorderBrush != pathBorder)
+            throw new InvalidOperationException("A focused button's border changed colour.");
         ExplainToggle.IsChecked = false;
         Search.Text = "zzzz-no-match";
         RefreshList();
         if (_checks.Count != 0) throw new InvalidOperationException("Search didn't filter.");
         Search.Text = "";
         RefreshList();
+        SelfTestDropdown();
         App.Tracker.SetFocus(null);
+        UpdateLayout();
+    }
+
+    /// <summary>Self-test: the hint dropdown opens under its box, closes on a click elsewhere or when the window moves.</summary>
+    private void SelfTestDropdown()
+    {
+        HintsToggle.IsChecked = true;
+        UpdateLayout();
+        HintSuggest.ItemsSource = new[] { new HintItem("Mantis Claw", 1, 1, false, false), new HintItem("Monarch Wings", 1, 0, false, true) };
+        HintPopup.IsOpen = true;
+        UpdateLayout();
+        if (!HintPopup.IsOpen || HintPopup.ActualHeight < 20) throw new InvalidOperationException("Hint dropdown didn't open.");
+        var box = HintBoxRow.TranslatePoint(new Point(0, HintBoxRow.ActualHeight), HintsPanel);
+        var drop = HintPopup.TranslatePoint(new Point(0, 0), HintsPanel);
+        if (Math.Abs(drop.Y - box.Y) > 12 || Math.Abs(drop.X - box.X) > 2) throw new InvalidOperationException("Hint dropdown isn't under its box.");
+
+        void Click(UIElement on) => on.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+        { RoutedEvent = PreviewMouseDownEvent, Source = on });
+        Click(HintBox);
+        if (!HintPopup.IsOpen) throw new InvalidOperationException("Hint dropdown closed on a click in its own box.");
+        Click(FTitle);
+        if (HintPopup.IsOpen) throw new InvalidOperationException("Hint dropdown stayed open after a click elsewhere.");
+
+        HintPopup.IsOpen = true;
+        var w = Window.GetWindow(this)!;
+        w.Left += 1;
+        w.Left -= 1;
+        if (HintPopup.IsOpen) throw new InvalidOperationException("Hint dropdown stayed open when the window moved.");
+        HintsToggle.IsChecked = false;
+        UpdateLayout();
+
+        // "Pretend you have an item…" works the same way: clicking into the box opens the list.
+        ItemsToggle.IsChecked = true;
+        UpdateLayout();
+        _shown!.ItemNames = new[] { "Mantis Claw", "Monarch Wings", "Mothwing Cloak" };
+        PretendBox.Focus();
+        UpdateLayout();
+        if (!PretendPopup.IsOpen) throw new InvalidOperationException("Pretend dropdown didn't open when the box was clicked.");
+        Click(FTitle);
+        if (PretendPopup.IsOpen) throw new InvalidOperationException("Pretend dropdown stayed open after a click elsewhere.");
+        ItemsToggle.IsChecked = false;
         UpdateLayout();
     }
 

@@ -58,6 +58,7 @@ public static class Demo
             HideExcluded = Environment.GetEnvironmentVariable("APMT_SHOT_HIDE_EXCL") == "1",   // check shot
             ShowItems = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") is "1" or "items",   // check shots
             ShowEvents = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") == "1",
+            ShowHints = Environment.GetEnvironmentVariable("APMT_SHOT_HINTS") == "1",
         };
     }
 
@@ -121,6 +122,16 @@ public static class Demo
                                     new JsonObject { ["name"] = "Can_Stag", ["location"] = "Dirtmouth_Stag_Event" },
                                     new JsonObject { ["name"] = "Opened_Black_Egg_Temple", ["location"] = "Opened_Black_Egg_Temple" })
                     : new JsonArray(),
+                ["hint_points"] = 502, ["hint_cost"] = 35,
+                ["hints"] = g.Id != "d1" ? new JsonArray() : new JsonArray(
+                    new JsonObject { ["item"] = "Mantis Claw", ["location"] = "Kakariko Well - Bottom", ["receiver"] = "FlippKnight", ["finder"] = "Kiwi",
+                                     ["found"] = false, ["status"] = 30, ["mine"] = true, ["in_my_world"] = false, ["prog"] = true },
+                    new JsonObject { ["item"] = "Monarch Wings", ["location"] = "Greenpath - Hornet", ["receiver"] = "FlippKnight", ["finder"] = "FlippKnight",
+                                     ["found"] = false, ["status"] = 30, ["mine"] = true, ["in_my_world"] = true, ["prog"] = true },
+                    new JsonObject { ["item"] = "Progressive Hookshot", ["location"] = "Sly_3", ["receiver"] = "FlippLink", ["finder"] = "FlippKnight",
+                                     ["found"] = false, ["status"] = 30, ["mine"] = false, ["in_my_world"] = true, ["prog"] = true },
+                    new JsonObject { ["item"] = "Hammer", ["location"] = "Iselda_1", ["receiver"] = "Kiwi", ["finder"] = "FlippKnight",
+                                     ["found"] = true, ["status"] = 40, ["mine"] = false, ["in_my_world"] = true, ["prog"] = true }),
                 ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
@@ -241,6 +252,20 @@ public static class Demo
             w.GoToTracker();
             w.ShowGoModeBanner(App.Tracker.Slots[3]);
             await Shot("gomode-banner");
+        }
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_HINTS") == "1")
+        {
+            // Check shot: the "Where is my item?" dropdown, open inside the Hints panel.
+            w.GoToTracker();
+            App.Tracker.SetFocus(App.Tracker.Slots[0]);
+            await Shot("hints-panel");
+            var t = w.TrackerView;
+            t.HintSuggest.ItemsSource = new[] { "Abyss Shriek", "City Crest", "Crystal Heart", "Desolate Dive", "Dream Nail", "Isma's Tear",
+                    "Lumafly Lantern", "Mantis Claw", "Monarch Wings", "Mothwing Cloak", "Shade Cloak", "Simple Key", "Tram Pass" }
+                .Select((n, i) => new HintItem(n, 1, i % 3 == 0 ? 0 : 1, n == "Mantis Claw", false)).ToList();
+            t.HintPopup.IsOpen = true;
+            await Shot("hints-dropdown");
+            t.HintPopup.IsOpen = false;
         }
         if (Environment.GetEnvironmentVariable("APMT_SHOT_FEED") == "1")
         {

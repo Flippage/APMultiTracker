@@ -149,6 +149,23 @@
             </DockPanel>
         </DataTemplate>
 
+        <!-- One hint in the Hints panel -->
+        <DataTemplate x:Key="HintRow" DataType="{x:Type local:HintInfo}">
+            <StackPanel Margin="2,4,4,4" Opacity="{Binding Fade}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Right" CornerRadius="4" Padding="4,0,4,1" Background="#262626" VerticalAlignment="Center"
+                            Visibility="{Binding Found, Converter={StaticResource Vis}}">
+                        <TextBlock Text="FOUND" FontSize="9" FontWeight="Bold" Foreground="{StaticResource SubBrush}"/>
+                    </Border>
+                    <TextBlock Text="{Binding Item}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource HintBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+                <TextBlock Text="{Binding Where}" FontSize="11.5" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding EntranceText}" FontSize="11" Foreground="{StaticResource SubBrush}" TextWrapping="Wrap"
+                           Visibility="{Binding HasEntrance, Converter={StaticResource Vis}}"/>
+            </StackPanel>
+        </DataTemplate>
+
         <!-- Game tile in the switcher -->
         <DataTemplate x:Key="GameTile" DataType="{x:Type local:SlotView}">
             <!-- Big number = checks in logic (red BK when stuck, a tick once the goal is done).
@@ -450,15 +467,17 @@
                     <Grid DockPanel.Dock="Right" Margin="12,0,0,0">
                         <Button Style="{StaticResource IconButton}" Tag="{StaticResource IconRefresh}" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 ToolTip="Rebuild this game's logic (re-reads its YAML)" Click="RefreshOne_Click"/>
-                        <StackPanel x:Name="ViewToggles" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,44,4,6">
+                        <!-- Wraps into two rows when the tracker is narrow (see UpdateCompact) -->
+                        <WrapPanel x:Name="ViewToggles" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,44,4,6">
                             <CheckBox x:Name="GroupToggle" Style="{StaticResource Toggle}" Content="Group by region" FontSize="12.5"
                                       Checked="View_Changed" Unchecked="View_Changed"/>
                             <CheckBox x:Name="ItemsToggle" Style="{StaticResource Toggle}" Content="Items" FontSize="12.5" Margin="18,0,0,0"
                                       Checked="View_Changed" Unchecked="View_Changed"/>
+                            <CheckBox x:Name="HintsToggle" Style="{StaticResource Toggle}" Content="Hints" FontSize="12.5" Margin="18,0,0,0"
+                                      Checked="View_Changed" Unchecked="View_Changed"/>
                             <CheckBox x:Name="ExplainToggle" Style="{StaticResource Toggle}" Content="Explain" FontSize="12.5" Margin="18,0,0,0"
-                                      Checked="View_Changed" Unchecked="View_Changed"
-                                      ToolTip="Why is a check (or region) in or out of logic? Same as UT's /explain and /get_logical_path"/>
-                        </StackPanel>
+                                      Checked="View_Changed" Unchecked="View_Changed"/>
+                        </WrapPanel>
                     </Grid>
                     <StackPanel Margin="18,2,8,0">
                         <TextBlock x:Name="FTitle" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
@@ -562,7 +581,7 @@
                 </WrapPanel>
             </DockPanel>
 
-            <Grid Grid.Row="3">
+            <Grid x:Name="FocusBody" Grid.Row="3">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition x:Name="ItemsCol" Width="0"/>
@@ -598,6 +617,7 @@
                             <MenuItem Header="Explain" Click="CtxExplain_Click"/>
                             <MenuItem Header="Show logical path" Click="CtxPath_Click"/>
                             <Separator/>
+                            <MenuItem x:Name="CtxHint" Header="Hint this location" Click="CtxHint_Click"/>
                             <MenuItem x:Name="CtxHide" Header="Hide / show this check" Click="CtxHide_Click"/>
                             <MenuItem Header="Hide all in-logic checks…" Click="CtxHideAll_Click"/>
                             <MenuItem Header="Unhide all hidden checks…" Click="CtxUnhideAll_Click"/>
@@ -638,10 +658,10 @@
                                     Margin="6,0,0,0" ToolTip="Close" Click="ExplainClose_Click"/>
                             <Button x:Name="PathBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="36" Padding="16,0" FontSize="13"
                                     Content="Logical path" Margin="8,0,0,0" Click="Path_Click"
-                                    ToolTip="How to reach it with what you have (UT's /get_logical_path). Shift+Enter in the box."/>
+                                    ToolTip="How to reach it with what you have. Shift+Enter in the box."/>
                             <Button x:Name="ExplainBtn" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Height="36" Padding="16,0" FontSize="13"
                                     Content="Explain" Margin="10,0,0,0" Click="Explain_Click"
-                                    ToolTip="What a check or region needs (UT's /explain). Enter in the box."/>
+                                    ToolTip="What a check or region needs. Enter in the box."/>
                             <TextBox x:Name="ExplainQuery" Style="{StaticResource Field}" MinHeight="36" FontSize="13"
                                      Tag="Location, region or entrance (close spellings are fine)" KeyDown="ExplainQuery_KeyDown"/>
                         </DockPanel>
@@ -656,15 +676,92 @@
                     </DockPanel>
                 </Border>
 
-                <Border x:Name="ItemsPanel" Grid.Column="1" Grid.RowSpan="3" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
+                <Grid x:Name="SidePanels" Grid.Column="1" Grid.RowSpan="3">
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="ItemsRow" Height="*"/>
+                    <RowDefinition x:Name="HintsRow" Height="0"/>
+                </Grid.RowDefinitions>
+                <!-- Hints: points, buy a hint, and every hint involving this game -->
+                <Border x:Name="HintsPanel" Grid.Row="1" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12"
+                        Padding="14,12,10,10" Visibility="Collapsed">
+                    <Grid>
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="2,0,0,2">
+                            <TextBlock x:Name="HintPointsText" DockPanel.Dock="Right" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="HINTS" Style="{StaticResource Caps}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <TextBlock x:Name="HintAffordText" DockPanel.Dock="Top" Style="{StaticResource Sub}" FontSize="11.5" Margin="2,0,0,8"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock DockPanel.Dock="Top" Text="Where is my item?" FontSize="12.5" FontWeight="SemiBold" Margin="2,0,0,6"/>
+                        <Grid x:Name="HintBoxRow" DockPanel.Dock="Top">
+                            <TextBox x:Name="HintBox" Style="{StaticResource Field}" MinHeight="32" Height="32" FontSize="12.5" Padding="10,0,34,0"
+                                     Tag="Search your items…" TextChanged="HintBox_TextChanged" PreviewKeyDown="HintBox_KeyDown"
+                                     LostKeyboardFocus="HintBox_LostFocus" GotKeyboardFocus="HintBox_GotFocus"/>
+                            <Button x:Name="HintArrow" Style="{StaticResource IconButton}" Width="28" Height="28" HorizontalAlignment="Right"
+                                    Margin="0,0,3,0" Tag="M6,9 L12,15 L18,9" ToolTip="Show all items" Click="HintArrow_Click"/>
+                        </Grid>
+                        <Button x:Name="HintBuyBtn" DockPanel.Dock="Top" Style="{StaticResource AccentButton}" Height="34" FontSize="12.5"
+                                Margin="0,8,0,0" HorizontalAlignment="Stretch" Click="HintBuy_Click" IsEnabled="False" Content="Pick an item to hint"/>
+                        <Border x:Name="HintResultBox" DockPanel.Dock="Top" Background="#151515" CornerRadius="8" Padding="10,8" Margin="0,8,0,0"
+                                Visibility="Collapsed">
+                            <ItemsControl x:Name="HintResult" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock local:Segments.Source="{Binding}" FontSize="12" TextWrapping="Wrap" Margin="0,1"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                        <DockPanel DockPanel.Dock="Top" Margin="2,12,0,4">
+                            <CheckBox x:Name="FoundHintsToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}" Content="Found" FontSize="11.5"
+                                      Checked="FoundHints_Changed" Unchecked="FoundHints_Changed" ToolTip="Also show hints that have been found"/>
+                            <TextBlock x:Name="HintsMineHeader" Style="{StaticResource Caps}" FontSize="10.5" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <ItemsControl x:Name="HintsMine" Focusable="False" ItemTemplate="{StaticResource HintRow}"/>
+                                <TextBlock x:Name="HintsTheirsHeader" Style="{StaticResource Caps}" FontSize="10.5" Margin="2,12,0,4"/>
+                                <ItemsControl x:Name="HintsTheirs" Focusable="False" ItemTemplate="{StaticResource HintRow}"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                    <!-- The item list for "Where is my item?" (inside the panel, so it moves with the window) -->
+                    <local:DropPanel x:Name="HintPopup" Target="{Binding ElementName=HintBoxRow}"
+                                     Background="#1A1A1A" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="4">
+                        <ListBox x:Name="HintSuggest" Style="{StaticResource CheckList}" Background="Transparent" MaxHeight="300"
+                                 PreviewMouseLeftButtonUp="HintSuggest_Click">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:HintItem}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding LeftText}" FontSize="11.5" Foreground="{StaticResource SubBrush}"
+                                                   Margin="6,0,2,0" VerticalAlignment="Center"/>
+                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="4,0,4,1" Background="{StaticResource HintDimBrush}"
+                                                VerticalAlignment="Center" Visibility="{Binding HasTag, Converter={StaticResource Vis}}">
+                                            <TextBlock Text="{Binding Tag}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </local:DropPanel>
+                    </Grid>
+                </Border>
+                <Border x:Name="ItemsPanel" Grid.Row="0" Margin="10,0,0,0" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12,4,8">
+                    <Grid>
                     <DockPanel>
                         <!-- Two tabs: items received / events (UT's /event_inventory) -->
-                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="2,0,0,8">
+                        <DockPanel DockPanel.Dock="Top" Margin="2,0,10,8">
+                            <TextBlock x:Name="ItemsSortBtn" DockPanel.Dock="Right" FontSize="11.5" Foreground="{StaticResource Text2Brush}"
+                                       Cursor="Hand" VerticalAlignment="Center" MouseLeftButtonUp="ItemsSort_Click"/>
+                            <StackPanel Orientation="Horizontal">
                             <TextBlock x:Name="ItemsHeader" Style="{StaticResource Caps}" Cursor="Hand" MouseLeftButtonUp="ItemsTab_Click"
                                        ToolTip="Items you've received"/>
                             <TextBlock x:Name="EventsHeader" Style="{StaticResource Caps}" Cursor="Hand" Margin="14,0,0,0" MouseLeftButtonUp="EventsTab_Click"
-                                       ToolTip="Events the logic has reached, like UT's /event_inventory"/>
-                        </StackPanel>
+                                       ToolTip="Milestones the logic has reached, like beating a boss or opening a door"/>
+                            </StackPanel>
+                        </DockPanel>
                         <TextBlock x:Name="EventsEmpty" DockPanel.Dock="Top" Style="{StaticResource Sub}" Margin="2,4,10,0" TextWrapping="Wrap"
                                    Visibility="Collapsed" Text="No events reached yet. Events are milestones the game's logic uses, like beating a boss."/>
                         <ListBox x:Name="EventsList" Style="{StaticResource CheckList}" Background="Transparent" Padding="0" Visibility="Collapsed">
@@ -680,24 +777,13 @@
                         </ListBox>
                         <!-- Pretend you have an item (UT's /manually_collect) -->
                         <StackPanel x:Name="PretendArea" DockPanel.Dock="Top" Margin="2,0,10,8">
-                            <Grid>
-                                <TextBox x:Name="PretendBox" Style="{StaticResource Field}" MinHeight="32" Height="32" FontSize="12.5" Padding="10,0"
+                            <Grid x:Name="PretendBoxRow">
+                                <TextBox x:Name="PretendBox" Style="{StaticResource Field}" MinHeight="32" Height="32" FontSize="12.5" Padding="10,0,34,0"
                                          Tag="Pretend you have an item…" TextChanged="PretendBox_TextChanged" PreviewKeyDown="PretendBox_KeyDown"
-                                         LostKeyboardFocus="PretendBox_LostFocus"
-                                         ToolTip="See what an item would unlock: the logic counts it as received (like UT's /manually_collect)"/>
-                                <Popup x:Name="PretendPopup" PlacementTarget="{Binding ElementName=PretendBox}" Placement="Bottom" StaysOpen="True"
-                                       AllowsTransparency="True" Width="{Binding ActualWidth, ElementName=PretendBox}">
-                                    <Border Background="#1A1A1A" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" Padding="4">
-                                        <ListBox x:Name="PretendSuggest" Style="{StaticResource CheckList}" Background="Transparent" MaxHeight="240"
-                                                 PreviewMouseLeftButtonUp="PretendSuggest_Click">
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                        </ListBox>
-                                    </Border>
-                                </Popup>
+                                         LostKeyboardFocus="PretendBox_LostFocus" GotKeyboardFocus="PretendBox_GotFocus"
+                                         ToolTip="See what an item would unlock: the logic counts it as received"/>
+                                <Button x:Name="PretendArrow" Style="{StaticResource IconButton}" Width="28" Height="28" HorizontalAlignment="Right"
+                                        Margin="0,0,3,0" Tag="M6,9 L12,15 L18,9" ToolTip="Show all items" Click="PretendArrow_Click"/>
                             </Grid>
                             <TextBlock x:Name="PretendError" Style="{StaticResource Sub}" Foreground="{StaticResource DangerBrush}" Margin="2,4,0,0"
                                        TextWrapping="Wrap" Visibility="Collapsed"/>
@@ -739,7 +825,21 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </DockPanel>
+                    <!-- Suggestions for "Pretend you have an item…" -->
+                    <local:DropPanel x:Name="PretendPopup" Target="{Binding ElementName=PretendBoxRow}"
+                                     Background="#1A1A1A" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="4">
+                        <ListBox x:Name="PretendSuggest" Style="{StaticResource CheckList}" Background="Transparent" MaxHeight="240"
+                                 PreviewMouseLeftButtonUp="PretendSuggest_Click">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </local:DropPanel>
+                    </Grid>
                 </Border>
+                </Grid>
             </Grid>
         </Grid>
 

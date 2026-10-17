@@ -172,6 +172,29 @@ public sealed class EngineClient
         return reply["error"]?.GetValue<string>();
     }
 
+    /// <summary>The game's items for "Where is my item?": how many are still out there, and hint state.</summary>
+    public async Task<IReadOnlyList<HintItem>> HintItemsAsync(string id)
+    {
+        var reply = await RequestAsync(new JsonObject { ["cmd"] = "hint_items", ["id"] = id }, TimeSpan.FromSeconds(20));
+        return (reply?["items"] as JsonArray)?.OfType<JsonObject>().Select(o => new HintItem(
+                   o["name"]?.GetValue<string>() ?? "", (int)Json.Long(o["total"]), (int)Json.Long(o["left"]),
+                   o["hinted"]?.GetValue<bool>() ?? false, o["found"]?.GetValue<bool>() ?? false)).ToList()
+               ?? new List<HintItem>();
+    }
+
+    /// <summary>Buys a hint as this slot (!hint item / !hint_location location). Returns the server's reply lines, or an error.</summary>
+    public async Task<(IReadOnlyList<IReadOnlyList<FeedSegment>> Lines, string? Error)> BuyHintAsync(string id, string kind, string name)
+    {
+        var reply = await RequestAsync(new JsonObject { ["cmd"] = "buy_hint", ["id"] = id, ["kind"] = kind, ["name"] = name },
+                                       TimeSpan.FromSeconds(15));
+        if (reply == null) return (Array.Empty<IReadOnlyList<FeedSegment>>(), "No answer from the engine.");
+        var lines = (reply["lines"] as JsonArray)?.OfType<JsonArray>()
+                        .Select(l => (IReadOnlyList<FeedSegment>)l.OfType<JsonObject>()
+                            .Select(x => new FeedSegment(x["text"]?.GetValue<string>() ?? "", x["color"]?.GetValue<string>() ?? "")).ToList())
+                        .ToList() ?? new List<IReadOnlyList<FeedSegment>>();
+        return (lines, reply["error"]?.GetValue<string>());
+    }
+
     /// <summary>Every item name in a tracked slot's game (for suggestions).</summary>
     public async Task<IReadOnlyList<string>> ItemNamesAsync(string id)
     {

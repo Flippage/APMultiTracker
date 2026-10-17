@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.0
+
+- **Hint shop** (engine v0.4.8): a **Hints** toggle next to Items and Explain opens a panel for the focused game:
+  - Your **hint points** and what a hint costs (the room's hint cost), and how many you can buy.
+  - **Where is my item?**: search your game's items (with how many of each are still out there), pick one and press
+    **Buy hint**. The button shows the cost, and the server's answer appears right under it. Re-showing a hint you
+    already have is free.
+  - Every hint for this game: **where your items are**, and **others' items in your world**, with found hints
+    tucked away behind the **Found** switch.
+- Right-click a check → **Hint this location** to find out what's there (like `!hint_location`).
+- With the feed docked along the bottom, the Items / Hints column now runs down to the bottom of the window and the
+  feed sits beside it, so the hint lists get the room.
+- **Items received** can be sorted **latest first** (click **A–Z ▾** in the Items panel), so the newest items are on top.
+- The **Pretend you have an item…** box works like Where is my item?: click into it (or its ▾) for the full item list,
+  type to filter.
+- Fix: clicking a button (like **Explain** or **Logical path**) left a cyan ring on it, which also made filled buttons
+  a little wider. The ring now only shows when you move around with the Tab key, and never changes a button's size.
+
 ## v0.10.5
 
 - **GO MODE notifications**: when one of your games goes into go mode, you get a Windows notification with the game's

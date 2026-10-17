@@ -53,7 +53,30 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     };
 }
 
-public sealed record ItemCount(string Name, int Count, bool Progression);
+/// <summary>An item received: how many, and <see cref="Last"/> = when the latest one arrived (higher is more recent).</summary>
+public sealed record ItemCount(string Name, int Count, bool Progression, int Last = -1);
+
+/// <summary>One of the game's items for "Where is my item?".</summary>
+public sealed record HintItem(string Name, int Total, int Left, bool Hinted, bool Found)
+{
+    /// <summary>How many of it are still out there ("none left" once you've received them all).</summary>
+    public string LeftText => Total <= 0 ? "" : Left > 0 ? $"×{Left}" : "none left";
+    public string Tag => Hinted ? "HINTED" : Found ? "FOUND" : "";
+    public bool HasTag => Tag.Length > 0;
+}
+
+/// <summary>A hint involving this slot: one of its items somewhere, or someone's item in its world.</summary>
+public sealed record HintInfo(string Item, string Location, string Receiver, string Finder, string Entrance,
+                              bool Found, int Status, bool Mine, bool InMyWorld, bool Progression)
+{
+    /// <summary>"at Location in Finder's world" / "at Location" (own world) for your items; "Receiver's item at Location" for others.</summary>
+    public string Where => Mine
+        ? (InMyWorld ? $"at {Location} (your world)" : $"at {Location} in {Finder}'s world")
+        : $"for {Receiver}, at {Location}";
+    public bool HasEntrance => Entrance.Length > 0;
+    public string EntranceText => $"via {Entrance}";
+    public double Fade => Found ? 0.45 : 1;
+}
 
 /// <summary>An event the logic has reached (UT's /event_inventory), and the event location it came from.</summary>
 public sealed record EventItem(string Name, string Location)
@@ -146,6 +169,12 @@ public sealed class SlotView : INotifyPropertyChanged
     public IReadOnlyList<CheckItem> Locations { get; private set; } = Array.Empty<CheckItem>();
     public IReadOnlyList<ItemCount> Items { get; private set; } = Array.Empty<ItemCount>();
     public IReadOnlyList<EventItem> Events { get; private set; } = Array.Empty<EventItem>();
+    public int HintPoints { get; private set; }
+    /// <summary>Points one hint costs this slot (0 = hints are free in this room).</summary>
+    public int HintCost { get; private set; }
+    public IReadOnlyList<HintInfo> Hints { get; private set; } = Array.Empty<HintInfo>();
+    /// <summary>"Where is my item?" choices, fetched when the Hints panel needs them.</summary>
+    public IReadOnlyList<HintItem>? HintItems { get; set; }
     /// <summary>Items we're pretending to have (UT's /manually_collect): the logic counts them as received.</summary>
     public IReadOnlyList<string> ManualItems { get; private set; } = Array.Empty<string>();
     public bool HasManual => ManualItems.Count > 0;
@@ -258,6 +287,16 @@ public sealed class SlotView : INotifyPropertyChanged
         Hidden = (int)Json.Long(m["ignored"]);
         GoMode = m["go_mode"]?.GetValue<string>() ?? "no";
         Goal = m["goal"]?.GetValue<bool>() ?? false;
+        HintPoints = (int)Json.Long(m["hint_points"]);
+        HintCost = (int)Json.Long(m["hint_cost"]);
+        Hints = (m["hints"] as JsonArray)?.OfType<JsonObject>().Select(o => new HintInfo(
+                    o["item"]?.GetValue<string>() ?? "?", o["location"]?.GetValue<string>() ?? "?",
+                    o["receiver"]?.GetValue<string>() ?? "", o["finder"]?.GetValue<string>() ?? "",
+                    o["entrance"]?.GetValue<string>() ?? "", o["found"]?.GetValue<bool>() ?? false,
+                    (int)Json.Long(o["status"]), o["mine"]?.GetValue<bool>() ?? false,
+                    o["in_my_world"]?.GetValue<bool>() ?? false, o["prog"]?.GetValue<bool>() ?? false))
+                .OrderBy(h => h.Found).ThenBy(h => h.Item, NaturalComparer.Instance).ToList()
+                ?? new List<HintInfo>();
         ManualItems = (m["manual_items"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0).ToList()
                       ?? new List<string>();
         AutoRelease = m["auto_release"]?.GetValue<bool>() ?? false;
@@ -303,7 +342,8 @@ public sealed class SlotView : INotifyPropertyChanged
         if (m["items"] is JsonArray its)
             foreach (var n in its)
                 if (n is JsonObject o)
-                    items.Add(new ItemCount(o["name"]?.GetValue<string>() ?? "?", (int)Json.Long(o["count"], 1), o["prog"]?.GetValue<bool>() ?? false));
+                    items.Add(new ItemCount(o["name"]?.GetValue<string>() ?? "?", (int)Json.Long(o["count"], 1), o["prog"]?.GetValue<bool>() ?? false,
+                                            (int)Json.Long(o["last"], -1)));
         Items = items.OrderByDescending(i => i.Progression).ThenBy(i => i.Name, NaturalComparer.Instance).ToList();
         Events = (m["events"] as JsonArray)?.OfType<JsonObject>()
                      .Select(o => new EventItem(o["name"]?.GetValue<string>() ?? "?", o["location"]?.GetValue<string>() ?? ""))
@@ -552,6 +592,15 @@ public sealed class TrackerStore
         if (slot != null) return _engine.Client.RefreshAsync(slot.Ref.Id);
         return System.Threading.Tasks.Task.WhenAll(Slots.Select(s => _engine.Client.RefreshAsync(s.Ref.Id)));
     }
+
+    public async System.Threading.Tasks.Task<IReadOnlyList<HintItem>> HintItemsAsync(SlotView slot, bool refresh = false)
+    {
+        if (!refresh && slot.HintItems is { Count: > 0 } cached) return cached;
+        return slot.HintItems = await _engine.Client.HintItemsAsync(slot.Ref.Id);
+    }
+
+    public System.Threading.Tasks.Task<(IReadOnlyList<IReadOnlyList<FeedSegment>> Lines, string? Error)> BuyHintAsync(
+        SlotView slot, string kind, string name) => _engine.Client.BuyHintAsync(slot.Ref.Id, kind, name);
 
     public System.Threading.Tasks.Task<string?> SetManualAsync(SlotView slot, IEnumerable<string> items) =>
         _engine.Client.SetManualAsync(slot.Ref.Id, items);

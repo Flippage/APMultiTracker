@@ -123,6 +123,8 @@ class SlotContext(CommonContext):
         self.last_packet = time.monotonic()
         self.last_attempt = time.monotonic()
         self.retry_failed_connect = False   # first connection failed (e.g. room asleep): keep trying
+        self._hint_capture: Optional[list] = None   # server replies collected while buying a hint
+        self._hint_lock = asyncio.Lock()
         self.updater_task = asyncio.create_task(self._updater(), name=f"updater {sid}")
         self.watchdog_task = asyncio.create_task(self._watchdog(), name=f"watchdog {sid}")
 
@@ -169,6 +171,11 @@ class SlotContext(CommonContext):
             self.set_status("reconnecting", "Lost connection to the server. Reconnecting…")
 
     def on_print_json(self, args: dict):
+        if self._hint_capture is not None and args.get("type") in ("CommandResult", "Hint"):
+            try:
+                self._hint_capture.append(self._render(args.get("data") or [], frozenset({self.slot})))
+            except Exception:
+                log.error(traceback.format_exc())
         try:
             self.engine.on_feed(self, args)
         except Exception:
@@ -375,10 +382,85 @@ class SlotContext(CommonContext):
             "game": self.slot_info[self.slot].game,
             "server_locations": set(self.server_locations),
             "goal": self.stored_data.get(self._status_key) == 30,   # ClientStatus.CLIENT_GOAL
+            "hint_points": int(self.hint_points or 0),
+            "hint_percent": int(self.hint_cost or 0),
+            "hint_list": self._hint_list(),
             # The room releases a slot's remaining items when it goals ("auto" / "auto_enabled" release mode)
             "auto_release": "auto" in str(self.permissions.get("release", "")),
         }
         return inputs
+
+    def _hint_list(self) -> list[dict]:
+        """Every hint involving this slot: where its items are, and what others' items sit in its world."""
+        out = []
+        for hint in self.stored_data.get(self._hint_key, None) or []:
+            try:
+                receiver, finder = hint["receiving_player"], hint["finding_player"]
+                out.append({
+                    "item": self.item_names.lookup_in_slot(hint["item"], receiver),
+                    "location": self.location_names.lookup_in_slot(hint["location"], finder),
+                    "receiver": self.player_names.get(receiver, f"Player {receiver}"),
+                    "finder": self.player_names.get(finder, f"Player {finder}"),
+                    "entrance": hint.get("entrance", "") or "",
+                    "found": bool(hint.get("found")),
+                    "status": int(hint.get("status", 0) or 0),
+                    "mine": self.slot_concerns_self(receiver),       # one of this slot's items
+                    "in_my_world": self.slot_concerns_self(finder),  # sits in this slot's world
+                    "prog": bool(int(hint.get("item_flags", 0) or 0) & 0b001),
+                })
+            except Exception:
+                log.error(traceback.format_exc())
+        return out
+
+    def hint_cost_points(self, total_locations: int) -> int:
+        """What one hint costs this slot, as the server works it out (a % of the slot's locations)."""
+        percent = int(self.hint_cost or 0)
+        return max(1, int(percent * 0.01 * total_locations)) if percent else 0
+
+    def hint_items(self) -> list[dict]:
+        """Worker thread: this game's items from the rebuilt item pool, how many are still out there, and hint state."""
+        core = self.core
+        if core is None or core.multiworld is None:
+            raise EngineError(f"{self.slot_name} isn't tracking yet.")
+        mw = core.multiworld
+        pool = collections.Counter(i.name for i in mw.itempool if i.player == core.player_id and i.code is not None)
+        # Items a game places directly (locked keys, vanilla items) aren't in the pool but are just as hintable.
+        for loc in mw.get_locations():
+            item = loc.item
+            if item is not None and item.player == core.player_id and item.code is not None and loc.locked:
+                pool[item.name] += 1
+        received = collections.Counter(self.item_names.lookup_in_slot(i.item, self.slot) for i in list(self.items_received))
+        hinted, found = set(), set()
+        for h in self._hint_list():
+            if h["mine"]:
+                (found if h["found"] else hinted).add(h["item"])
+        names = set(pool) or set(core.get_current_world().item_name_to_id)
+        return sorted(({"name": n, "total": pool.get(n, 0), "left": max(0, pool.get(n, 0) - received.get(n, 0)),
+                        "hinted": n in hinted, "found": n in found and n not in hinted} for n in names),
+                      key=lambda i: i["name"].lower())
+
+    async def buy_hint(self, kind: str, name: str) -> list[list[dict]]:
+        """Asks the server for a hint (!hint item / !hint_location location) as this slot; returns its replies."""
+        if not self._socket_open() or self.slot is None:
+            raise EngineError(f"{self.slot_name} isn't connected right now.")
+        name = name.strip()
+        if not name:
+            raise EngineError("Pick something to hint first.")
+        async with self._hint_lock:
+            self._hint_capture = []
+            try:
+                command = "!hint_location" if kind == "location" else "!hint"
+                await self.send_msgs([{"cmd": "Say", "text": f"{command} {name}"}])
+                waited = 0.0
+                while waited < 6.0:
+                    await asyncio.sleep(0.1)
+                    waited += 0.1
+                    if self._hint_capture:
+                        await asyncio.sleep(0.6)   # the result often comes as several lines
+                        break
+                return list(self._hint_capture)
+            finally:
+                self._hint_capture = None
 
     def _hint_text(self, hint: dict) -> str:
         item = self.item_names.lookup_in_slot(hint["item"], hint["receiving_player"])
@@ -461,7 +543,11 @@ class SlotContext(CommonContext):
             events.sort(key=lambda e: (e["name"], e["location"]))
         # UT counts pretend items (/manually_collect) as received; they aren't, so leave them out here.
         pretend = collections.Counter(getattr(core, "manual_items", []))
-        items = [{"name": name, "count": count - pretend[name], "prog": name in ret.prog_items}
+        # When each item last arrived (its position in the received list), for "latest first" sorting.
+        last = {}
+        for index, received in enumerate(inputs["items"]):
+            last[self.item_names.lookup_in_slot(received.item, self.slot)] = index
+        items = [{"name": name, "count": count - pretend[name], "prog": name in ret.prog_items, "last": last.get(name, -1)}
                  for name, count in ret.all_items.items() if count - pretend[name] > 0]
         return {
             "type": "slot",
@@ -485,6 +571,10 @@ class SlotContext(CommonContext):
             "locations": locations,
             "items": items,
             "events": events,
+            "hint_points": inputs["hint_points"],
+            "hint_cost": self.hint_cost_points(inputs["total"]),
+            "hint_percent": inputs["hint_percent"],
+            "hints": inputs["hint_list"],
             "manual_items": list(getattr(core, "manual_items", [])),
             "errors": errors,
             "warning": self.warning,
@@ -929,6 +1019,24 @@ class Engine:
             except EngineError as e:
                 error = str(e)
             await ws.send(json.dumps({"type": "manual", "req": msg.get("req"), "error": error}))
+        elif cmd == "hint_items":
+            ctx = self.slots.get(msg["id"])
+            try:
+                if ctx is None:
+                    raise EngineError("That game isn't being tracked.")
+                reply = {"items": await self.run_logic(ctx.hint_items)}
+            except EngineError as e:
+                reply = {"items": [], "error": str(e)}
+            await ws.send(json.dumps({"type": "hint_items", "req": msg.get("req"), **reply}))
+        elif cmd == "buy_hint":
+            ctx = self.slots.get(msg["id"])
+            try:
+                if ctx is None:
+                    raise EngineError("That game isn't being tracked.")
+                reply = {"lines": await ctx.buy_hint(str(msg.get("kind", "item")), str(msg.get("name", "")))}
+            except EngineError as e:
+                reply = {"lines": [], "error": str(e)}
+            await ws.send(json.dumps({"type": "buy_hint", "req": msg.get("req"), **reply}))
         elif cmd == "item_names":
             ctx = self.slots.get(msg["id"])
             try:
