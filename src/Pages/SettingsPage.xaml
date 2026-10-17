@@ -184,6 +184,56 @@
                 </DockPanel>
             </Border>
 
+            <!-- Notifications -->
+            <TextBlock Text="NOTIFICATIONS" Style="{StaticResource Caps}" Margin="0,26,0,8"/>
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12">
+                <StackPanel>
+                    <DockPanel Margin="20,14">
+                        <CheckBox x:Name="GoNotifyToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}"
+                                  Checked="GoPrefs_Changed" Unchecked="GoPrefs_Changed"/>
+                        <StackPanel>
+                            <TextBlock Text="GO MODE notifications" Style="{StaticResource ItemTitle}"/>
+                            <TextBlock Text="When one of your games goes into go mode: a Windows notification, or a banner here when APMultiTracker is in front. Click it to open that game."
+                                       Style="{StaticResource Sub}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <Rectangle Height="1" Fill="#1F1F1F"/>
+                    <DockPanel x:Name="GoSoundRow" Margin="20,14">
+                        <CheckBox x:Name="GoSoundToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}"
+                                  Checked="GoPrefs_Changed" Unchecked="GoPrefs_Changed"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Content="Test" Height="36" Padding="14,0"
+                                FontSize="12.5" Margin="0,0,14,0" VerticalAlignment="Center" Click="GoTest_Click"/>
+                        <Button x:Name="GoSoundResetBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Content="Use built-in" Height="36"
+                                Padding="14,0" FontSize="12.5" Margin="0,0,8,0" VerticalAlignment="Center" Click="GoSoundReset_Click"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Content="Choose sound…" Height="36" Padding="14,0"
+                                FontSize="12.5" Margin="0,0,8,0" VerticalAlignment="Center" Click="GoSoundChoose_Click"/>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Play the GO MODE jingle" Style="{StaticResource ItemTitle}"/>
+                            <TextBlock x:Name="GoSoundSub" Style="{StaticResource Sub}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <Rectangle Height="1" Fill="#1F1F1F"/>
+                    <DockPanel x:Name="GoVolumeRow" Margin="20,14">
+                        <Border DockPanel.Dock="Right" Background="{StaticResource FieldDeepBrush}" BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="2" CornerRadius="24" Padding="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource BtnBase}" Background="Transparent" Width="44" Padding="0" FontSize="20"
+                                        Content="−" ToolTip="Quieter" Click="GoVolumeDown_Click"/>
+                                <TextBlock x:Name="GoVolumeText" MinWidth="64" TextAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="16" FontWeight="Bold"/>
+                                <Button Style="{StaticResource BtnBase}" Background="Transparent" Width="44" Padding="0" FontSize="20"
+                                        Content="+" ToolTip="Louder" Click="GoVolumeUp_Click"/>
+                            </StackPanel>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Jingle volume" Style="{StaticResource ItemTitle}"/>
+                            <TextBlock Text="How loud the GO MODE jingle plays. You'll hear it at the new volume as you change it."
+                                       Style="{StaticResource Sub}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
             <!-- App -->
             <TextBlock Text="APP" Style="{StaticResource Caps}" Margin="0,26,0,8"/>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12">

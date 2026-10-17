@@ -108,6 +108,7 @@ public partial class App : Application
         Tracker = new TrackerStore(Engine);
         Updater = new Updater(Config);
         Rooms = new RoomWatcher(Tracker);
+        Notifier.Init();
         Engine.Changed += () =>
         {
             if (Engine.State != EngineState.Running) Tracker.MarkAllOffline();

@@ -41,6 +41,7 @@ in one place, with a faster, cleaner interface.
 | 🚪 **New entrances** | Entrance randomizers that reveal entrances as you go (like Spicy Mycena 64's paintings): entrances you can reach but haven't been through yet are listed, like UT's unconnected entrances, with their own filter. |
 | 🏆 **Events** | The events the logic has reached (like UT's `/event_inventory`), in their own tab next to the items you've received. |
 | 🧪 **Pretend items** | Pretend you have an item to see what it unlocks (like UT's `/manually_collect`), with a clear warning while it's on. |
+| 🔔 **GO MODE alerts** | A Windows notification (or an in-app banner) and a jingle when one of your games enters go mode. Volume, your own sound, or off, in Settings. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`), or hide / unhide them all at once (`/ignore_all`, `/reset_ignored`). |
 | 🚫 **Excluded checks** | Checks excluded in a YAML are dimmed and tagged (or hidden, in Settings) and never count toward a game's number. |

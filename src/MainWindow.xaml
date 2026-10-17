@@ -115,6 +115,24 @@
 
         <ContentControl x:Name="Host" Grid.Column="1" Focusable="False"/>
 
+        <!-- GO MODE banner (when the app is in front; otherwise it's a Windows notification). Click to open the game. -->
+        <Border x:Name="GoBanner" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24"
+                Width="360" CornerRadius="14" Background="#101F15" BorderBrush="{StaticResource InLogicBrush}" BorderThickness="2"
+                Visibility="Collapsed" Cursor="Hand" MouseLeftButtonUp="GoBanner_Click">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="8" Opacity="0.6" Color="Black"/>
+            </Border.Effect>
+            <DockPanel Margin="14,14,10,14">
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Tag="{StaticResource IconClose}"
+                        Width="30" Height="30" VerticalAlignment="Top" ToolTip="Dismiss" Click="GoBannerClose_Click"/>
+                <Border x:Name="GoBannerArt" DockPanel.Dock="Left" Width="42" Height="56" CornerRadius="6" Background="#1F1F1F" Margin="0,0,14,0"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="GO MODE" FontSize="17" FontWeight="Bold" Foreground="{StaticResource InLogicBrush}"/>
+                    <TextBlock x:Name="GoBannerText" FontSize="12.5" Foreground="#C8E8D2" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- In-app update toast (bottom-right, 10 s, pauses on hover) -->
         <Border x:Name="UpdateToast" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24"
                 Width="360" CornerRadius="14" Background="#1A1A1A" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"

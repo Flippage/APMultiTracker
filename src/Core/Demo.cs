@@ -61,6 +61,14 @@ public static class Demo
         };
     }
 
+    private static System.Windows.Controls.ScrollViewer? FindScroll(DependencyObject d)
+    {
+        if (d is System.Windows.Controls.ScrollViewer sv) return sv;
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++)
+            if (FindScroll(System.Windows.Media.VisualTreeHelper.GetChild(d, i)) is { } found) return found;
+        return null;
+    }
+
     public static void Feed(TrackerStore store)
     {
         var rng = new Random(7);
@@ -221,6 +229,19 @@ public static class Demo
         w.OpenPatchNotes();
         await Shot("patch-notes");
         w.ClosePatchNotes();
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_GOMODE") == "1")
+        {
+            // Check shots (not used for the README): the Notifications settings and the in-app GO MODE banner.
+            if (w.Host.Content is FrameworkElement page && FindScroll(page) is System.Windows.Controls.ScrollViewer sv)
+            {
+                sv.UpdateLayout();
+                sv.ScrollToVerticalOffset(sv.ScrollableHeight * 0.62);
+            }
+            await Shot("settings-notifications");
+            w.GoToTracker();
+            w.ShowGoModeBanner(App.Tracker.Slots[3]);
+            await Shot("gomode-banner");
+        }
         if (Environment.GetEnvironmentVariable("APMT_SHOT_FEED") == "1")
         {
             // Checks the docked feed's limits at a typical window size (not used for the README).

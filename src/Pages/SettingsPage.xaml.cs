@@ -99,6 +99,9 @@ public partial class SettingsPage : UserControl
         _loading = true;
         TopToggle.IsChecked = App.Config.AlwaysOnTop;
         HideExcludedToggle.IsChecked = App.Config.HideExcluded;
+        GoNotifyToggle.IsChecked = App.Config.GoModeNotify;
+        GoSoundToggle.IsChecked = App.Config.GoModeSound;
+        UpdateGoSound();
         StartupToggle.IsChecked = App.Config.StartWithWindows;
         _loading = false;
     }
@@ -163,6 +166,68 @@ public partial class SettingsPage : UserControl
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{Log.Dir}\"") { UseShellExecute = true });
         }
         catch { }
+    }
+
+    // ------------------------------------------------------------ GO MODE notifications
+
+    private void UpdateGoSound()
+    {
+        string custom = App.Config.GoModeSoundPath;
+        bool hasCustom = custom.Length > 0;
+        GoSoundSub.Text = hasCustom ? $"Sound: {System.IO.Path.GetFileName(custom)}" + (System.IO.File.Exists(custom) ? "" : " (missing, using the built-in fanfare)")
+                                    : "Sound: the built-in fanfare. Quiet while Windows is in do not disturb.";
+        GoSoundResetBtn.Visibility = hasCustom ? Visibility.Visible : Visibility.Collapsed;
+        GoSoundRow.IsEnabled = App.Config.GoModeNotify;
+        GoSoundRow.Opacity = App.Config.GoModeNotify ? 1 : 0.5;
+        bool volumeOn = App.Config.GoModeNotify && App.Config.GoModeSound;
+        GoVolumeRow.IsEnabled = volumeOn;
+        GoVolumeRow.Opacity = volumeOn ? 1 : 0.5;
+        GoVolumeText.Text = $"{App.Config.GoModeVolume} %";
+    }
+
+    private void GoPrefs_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Config.GoModeNotify = GoNotifyToggle.IsChecked == true;
+        App.Config.GoModeSound = GoSoundToggle.IsChecked == true;
+        App.SaveConfig();
+        UpdateGoSound();
+    }
+
+    private void GoSoundChoose_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose the GO MODE sound",
+            Filter = "Sound files (*.wav;*.mp3;*.wma;*.m4a)|*.wav;*.mp3;*.wma;*.m4a|All files|*.*",
+        };
+        if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
+        App.Config.GoModeSoundPath = dlg.FileName;
+        App.SaveConfig();
+        UpdateGoSound();
+        Notifier.PlayJingle();
+    }
+
+    private void GoSoundReset_Click(object sender, RoutedEventArgs e)
+    {
+        App.Config.GoModeSoundPath = "";
+        App.SaveConfig();
+        UpdateGoSound();
+    }
+
+    private void GoTest_Click(object sender, RoutedEventArgs e) => Notifier.Test();
+
+    private void GoVolumeDown_Click(object sender, RoutedEventArgs e) => SetGoVolume(App.Config.GoModeVolume - 10);
+    private void GoVolumeUp_Click(object sender, RoutedEventArgs e) => SetGoVolume(App.Config.GoModeVolume + 10);
+
+    private void SetGoVolume(int volume)
+    {
+        volume = Math.Clamp((int)Math.Round(volume / 10.0) * 10, 0, 100);
+        if (volume == App.Config.GoModeVolume) return;
+        App.Config.GoModeVolume = volume;
+        App.SaveConfig();
+        UpdateGoSound();
+        Notifier.PlayJingle();   // hear the new level
     }
 
     private void HideExcluded_Changed(object sender, RoutedEventArgs e)

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.5
+
+- **GO MODE notifications**: when one of your games goes into go mode, you get a Windows notification with the game's
+  box art (or a banner in the corner when APMultiTracker is in front) and a short **GO MODE jingle**. Click it to open
+  that game. It only fires for real go mode: not glitched, not games that were already in go mode when the app
+  started, and not go mode that's only thanks to pretend items.
+- Settings → **Notifications**: turn the notification or the jingle off, set the **jingle volume** (−/+), choose your
+  own sound file, or press **Test**. The jingle stays quiet while Windows is in do not disturb, but does play over
+  full-screen games. The notification shows for about 5 seconds (never more than 6) and stays in Windows' notification center.
+
 ## v0.10.4
 
 - **Pretend you have an item** (engine v0.4.5): in the Items panel, type an item into **Pretend you have an item…**

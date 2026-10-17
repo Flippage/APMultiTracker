@@ -37,6 +37,13 @@ public sealed class AppConfig
     public bool OverviewGroupByRegion { get; set; }
     /// <summary>Leave excluded checks out of the lists (like UT's hide_excluded_locations).</summary>
     public bool HideExcluded { get; set; }
+    /// <summary>GO MODE notification (Windows toast, or an in-app banner when the app is in front).</summary>
+    public bool GoModeNotify { get; set; } = true;
+    public bool GoModeSound { get; set; } = true;
+    /// <summary>GO MODE jingle volume, 0–100 %.</summary>
+    public int GoModeVolume { get; set; } = 80;
+    /// <summary>A sound file to play instead of the built-in fanfare (empty = built-in).</summary>
+    public string GoModeSoundPath { get; set; } = "";
     public double ExplainHeight { get; set; } = 200;
     /// <summary>Per slot (SlotRef.Id): region groups collapsed in the check list.</summary>
     public Dictionary<string, List<string>> CollapsedRegions { get; set; } = new();

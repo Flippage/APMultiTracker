@@ -344,6 +344,52 @@ public partial class MainWindow : Window
         ToastBarScale.ApplyAnimationClock(ScaleTransform.ScaleXProperty, _toastClock);
     }
 
+    // ------------------------------------------------------------------ GO MODE banner
+
+    private SlotView? _goBannerSlot;
+    private readonly DispatcherTimer _goBannerTimer = new() { Interval = TimeSpan.FromSeconds(9) };
+    private bool _goBannerHooked;
+
+    public void ShowGoModeBanner(SlotView slot)
+    {
+        _goBannerSlot = slot;
+        GoBannerText.Text = $"{slot.SlotName} ({slot.Title}) has entered GO MODE!";
+        Art.SetUrl(GoBannerArt, slot.ArtUrl);
+        GoBanner.Visibility = Visibility.Visible;
+        GoBanner.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)));
+        if (!_goBannerHooked) { _goBannerHooked = true; _goBannerTimer.Tick += (_, _) => HideGoBanner(); }
+        _goBannerTimer.Stop();
+        _goBannerTimer.Start();
+    }
+
+    private void HideGoBanner()
+    {
+        _goBannerTimer.Stop();
+        GoBanner.BeginAnimation(OpacityProperty, null);
+        GoBanner.Visibility = Visibility.Collapsed;
+    }
+
+    private void GoBanner_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject d && FindParent<System.Windows.Controls.Button>(d) != null) return;   // the × button
+        var slot = _goBannerSlot;
+        HideGoBanner();
+        if (slot == null) return;
+        var live = App.Tracker.Live.FirstOrDefault(l => l.Slots.Contains(slot));
+        if (live != null && App.Tracker.Active != live.World) App.Tracker.Activate(live.World);
+        App.Tracker.SetFocus(slot);
+        GoToTracker();
+    }
+
+    private void GoBannerClose_Click(object sender, RoutedEventArgs e) => HideGoBanner();
+
+    private static T? FindParent<T>(DependencyObject d) where T : DependencyObject
+    {
+        for (var p = d; p != null; p = VisualTreeHelper.GetParent(p))
+            if (p is T t) return t;
+        return null;
+    }
+
     private void HideToast()
     {
         if (UpdateToast.Visibility != Visibility.Visible) return;

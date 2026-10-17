@@ -587,19 +587,25 @@ public sealed class TrackerStore
         }
         if (type == "slot")
         {
-            // Say so in the feed when a game goes into go mode (not when it already was at startup).
+            // Say so (feed, notification) when a game goes into real go mode: not when it already was at startup,
+            // and not when it's only thanks to pretend items.
             bool hadData = slot.HasData, wasGo = slot.GoMode == "yes";
             slot.ApplySnapshot(m);
-            if (hadData && !wasGo && slot.GoMode == "yes" && _live.Values.FirstOrDefault(l => l.Slots.Contains(slot)) is { } live)
+            if (hadData && !wasGo && slot.GoMode == "yes" && !slot.HasManual && !slot.Goal
+                && _live.Values.FirstOrDefault(l => l.Slots.Contains(slot)) is { } live)
+            {
+                Notifier.GoMode(slot, live);
                 AddFeed(live.World.Id, new JsonObject
                 {
                     ["kind"] = "Text",
                     ["time"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
                     ["segments"] = new JsonArray(
+                        new JsonObject { ["text"] = $"{slot.SlotName} ({slot.Title}) has entered " },
                         new JsonObject { ["text"] = "GO MODE", ["color"] = "green" },
-                        new JsonObject { ["text"] = $": {slot.SlotName} ({slot.Title}) can finish their game." }),
+                        new JsonObject { ["text"] = "!" }),
                     ["players"] = new JsonArray(),
                 });
+            }
         }
         else if (type == "status") slot.ApplyStatus(m);
         else if (type == "removed") slot.Reset();
