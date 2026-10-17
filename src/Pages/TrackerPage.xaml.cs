@@ -471,8 +471,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             }
         }
         double width = ItemsCol.Width.Value;   // the column stays reserved in the focused view
-        FeedDock.Margin = new Thickness(32, 0, tall ? 32 + width : 32, 20);
-        FeedHSplit.Margin = new Thickness(0, 0, tall ? 32 + width : 0, 0);
+        // Only the bottom dock's margins are ours to change (ApplyFeedDock sets the right dock's).
+        if (App.Config.FeedDock == "Bottom")
+        {
+            FeedDock.Margin = new Thickness(32, 0, tall ? 32 + width : 32, 20);
+            FeedHSplit.Margin = new Thickness(0, 0, tall ? 32 + width : 0, 0);
+        }
         if (tall) PlaceTallSide();
     }
 
@@ -494,6 +498,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException($"Docked feed ({App.Config.FeedDock}) is {FeedDock.ActualWidth:0}x{FeedDock.ActualHeight:0}.");
         if (MainContent.ActualWidth < 300 || MainContent.ActualHeight < 250)
             throw new InvalidOperationException($"Tracker squeezed to {MainContent.ActualWidth:0}x{MainContent.ActualHeight:0} by the docked feed.");
+        // Its spacing must be the dock's own (a later layout change once overwrote it with the bottom dock's).
+        var want = App.Config.FeedDock == "Bottom" ? new Thickness(32, 0, FeedDock.Margin.Right, 20) : new Thickness(0, 26, 24, 20);
+        if (FeedDock.Margin != want)
+            throw new InvalidOperationException($"Docked feed ({App.Config.FeedDock}) has the wrong spacing: {FeedDock.Margin}.");
     }
 
     private void FeedSplit_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
