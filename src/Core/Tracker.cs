@@ -177,6 +177,7 @@ public sealed class SlotView : INotifyPropertyChanged
     {
         if (locked == Locked) return;
         Locked = locked;
+        Notify(nameof(Locked));
         if (_lastSnapshot != null) ApplySnapshot(_lastSnapshot);
         else NotifyAll();
     }

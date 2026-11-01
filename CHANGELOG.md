@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.3
+
+- **All games: unlocked games first**: in a room with a SlotLock player, the columns of games that are still
+  **LOCKED** move to the right, so the games you can play sit side by side on the left instead of being spread out
+  between locked ones. A game moves over by itself as soon as it unlocks. Without SlotLock the order is unchanged.
+
 ## v0.11.2
 
 - **SlotLock support** (engine v0.4.11): in a room with a SlotLock player, games it has locked show **LOCKED** instead

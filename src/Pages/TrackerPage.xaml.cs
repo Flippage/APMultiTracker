@@ -47,7 +47,13 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         _view = new ListCollectionView(_checks);
         CheckListBox.ItemsSource = _view;
         Tiles.ItemsSource = App.Tracker.Slots;
-        Columns.ItemsSource = App.Tracker.Slots;
+        // All games: unlocked games first so they sit side by side; locked ones (SlotLock) after, in room order
+        var columns = new ListCollectionView(App.Tracker.Slots);
+        columns.SortDescriptions.Add(new SortDescription(nameof(SlotView.Locked), ListSortDirection.Ascending));
+        columns.SortDescriptions.Add(new SortDescription(nameof(SlotView.Index), ListSortDirection.Ascending));
+        columns.LiveSortingProperties.Add(nameof(SlotView.Locked));
+        columns.IsLiveSorting = true;
+        Columns.ItemsSource = columns;
 
         _searchDebounce.Tick += (_, _) => { _searchDebounce.Stop(); RefreshList(); };
         App.Tracker.Changed += OnTrackerChanged;
