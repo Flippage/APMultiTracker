@@ -190,6 +190,12 @@ public static class Demo
             using var f = File.Create(Path.Combine(dir, name + ".png"));
             enc.Save(f);
         }
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_LOCKS") == "1")
+        {
+            // Check shots: a SlotLock player has locked Hollow Knight and Stardew Valley (the engine's "locks" message).
+            App.Tracker.ApplyLocks(new JsonObject { ["type"] = "locks", ["room"] = "demo", ["slotlock"] = "Locker",
+                ["locked"] = new JsonArray("FlippKnight", "FlippFarmer"), ["unlocked"] = new JsonArray("FlippLink", "FlippTime") });
+        }
         w.GoToTracker();
         App.Tracker.SetFocus(null);
         await Shot("overview");

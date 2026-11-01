@@ -191,6 +191,7 @@ class SlotContext(CommonContext):
                 self.room_seed = args.get("seed_name", "")
             elif cmd == "Connected":
                 self.slot_data = args.get("slot_data") or {}
+                self.engine.ensure_lock_watchers(self)
                 self.set_notify(self._status_key)   # goal reached? (resent on every reconnect by CommonContext)
                 self.engine.spawn(self._initialize(), f"init {self.sid}")
             elif cmd in ("RoomUpdate", "ReceivedItems", "LocationInfo"):
@@ -241,6 +242,12 @@ class SlotContext(CommonContext):
             return
         game = self.slot_info[self.slot].game
         slot_name = self.slot_info[self.slot].name
+        if game == SLOTLOCK_GAME:
+            # SlotLock has no logic to track; its lock state is shown on the games it locks.
+            self.logic_ready = False
+            self.set_status("tracking", "")
+            self.engine.send_slotlock_summary(self)
+            return
         persist_id = f"{self.room_seed}:{self.team}:{self.slot}"
         if self.core is not None and persist_id == self.persist_id and not rebuild:
             self.logic_ready = True  # reconnected to the same room: the logic we built still applies
@@ -277,16 +284,32 @@ class SlotContext(CommonContext):
         core = TrackerCore(log, False, False)
         apply_host_settings(core)
         core.set_slot_params(game, self.slot, slot_name, self.team)
+        own_yaml_note = own_error = ""
         if not getattr(world_cls, "ut_can_gen_without_yaml", False):
             shared = self.engine.yaml_world(self.yaml_folder)
+            if shared.launch_multiworld is None:
+                # Someone else's YAML can break the whole folder (a newer Archipelago, an option this rebuild can't
+                # apply...). Build this game from just its own player's YAML instead.
+                own = self.engine.own_yaml_world(self.yaml_folder, slot_name)
+                if own.launch_multiworld is not None:
+                    log.info(f"{slot_name}: the YAML folder couldn't be loaded as a whole; using just {slot_name}'s YAML")
+                    own_yaml_note = (f"Another YAML in the folder couldn't be loaded ({last_line(shared.gen_error)}), "
+                                     f"so {game} was built from {slot_name}'s YAML on its own.")
+                    shared = own
+                else:
+                    own_error = last_line(own.gen_error)
             core.launch_multiworld = shared.launch_multiworld
             core.common_option_overrides = dict(shared.common_option_overrides)
             core.player_folder_override = shared.player_folder_override
             if shared.launch_multiworld is None:
                 where = self.yaml_folder or "Universal Tracker's Players folder"
                 detail = last_line(shared.gen_error)
+                if own_error.startswith("No YAML with name"):
+                    raise EngineError(f"{game} needs {slot_name}'s YAML, but there's no YAML named “{slot_name}” in {where} "
+                                      f"(and the folder as a whole couldn't be loaded: {detail}).")
                 raise EngineError(f"{game} needs your YAML, but the YAMLs in {where} couldn't be loaded"
-                                  + (f": {detail}" if detail else "."))
+                                  + (f": {detail}" if detail else ".")
+                                  + (f" {slot_name}'s own YAML failed too: {own_error}" if own_error and own_error != detail else ""))
         core.initalize_tracker_core(world_cls, slot_data)
         # If a world's rebuild from slot_data fails, UT keeps the YAML multiworld but leaves player_id at 1,
         # which can point at a different game. Point it back at this slot, or give up cleanly.
@@ -299,7 +322,7 @@ class SlotContext(CommonContext):
             else:
                 raise EngineError(f"Universal Tracker couldn't rebuild {game}'s logic: "
                                   f"{last_line(core.gen_error) or 'unknown error'}")
-        if core.tracker_disabled:
+        if getattr(core, "tracker_disabled", False):   # not in Universal Tracker before 0.2.34
             raise EngineError(core.gen_error or f"Universal Tracker can't track {game} with these options.")
         if core.multiworld is None or core.player_id is None:
             errors = [line.location_label for lines in core.log_lines.values() for line in lines]
@@ -311,7 +334,7 @@ class SlotContext(CommonContext):
 
         # A world can fail to rebuild from slot_data yet leave usable (if less accurate) logic behind.
         self.warning = (f"Universal Tracker couldn't fully rebuild {game}'s logic, so results may be "
-                        f"incomplete: {last_line(core.gen_error)}") if core.gen_error else ""
+                        f"incomplete: {last_line(core.gen_error)}") if core.gen_error else own_yaml_note
         world = core.get_current_world()
         self.region_by_name = {
             loc.name: (loc.parent_region.name if loc.parent_region is not None else "")
@@ -748,6 +771,18 @@ class SlotContext(CommonContext):
         await self.shutdown()
 
 
+class _UiShim:
+    """Stands in for UT's window: older UT versions (before 0.3.3) print the logical path through ctx.ui."""
+
+    def __init__(self, messages: list):
+        self.messages = messages
+        self.last_autofillable_command = ""
+        self.loc_icon_size = 0
+
+    def print_json(self, parts):
+        self.messages.append(parts)
+
+
 class _ExplainContext:
     """Just enough of UT's TrackerGameContext for its explain/get_logical_path helpers."""
 
@@ -755,8 +790,9 @@ class _ExplainContext:
         self.tracker_core = core
         self._ret = ret
         self.server_locations = server_locations
-        self.ui = True  # get_logical_path refuses to run without a UI
         self.messages: list = []
+        self.ui = _UiShim(self.messages)  # get_logical_path refuses to run without a UI (and older UTs print through it)
+        self.logical_path_entrances: list = []  # UT 0.3.5+: entrances on the path (for its map), cleared and refilled
 
     def updateTracker(self):
         return self._ret
@@ -781,6 +817,57 @@ class _ThreadLogCapture(logging.Handler):
         if record.thread == self.thread:
             color = "red" if record.levelno >= logging.WARNING else ""
             self.messages.append([{"type": "color" if color else "text", "color": color, "text": record.getMessage()}])
+
+
+SLOTLOCK_GAME = "SlotLock"
+
+
+class LockWatcher(CommonContext):
+    """
+    A read-only connection as a SlotLock player: SlotLock locks other slots in logic until its player receives
+    "Unlock <slot name>". Its slot data lists the locked slots; the items it has received say which are open.
+    (Universal Tracker ignores SlotLock, so without this every locked game would look playable.)
+    """
+    game = ""
+    tags = CommonContext.tags | {"Tracker"}
+    items_handling = 0b111
+    want_slot_data = True
+
+    def __init__(self, engine: "Engine", room: str, server: str, slot_name: str, password: Optional[str]):
+        super().__init__(server, password or None)
+        self.engine = engine
+        self.room = room
+        self.auth = slot_name
+        self.slot_name = slot_name
+        self.locked_slots: list[str] = []
+        self.known = False
+
+    async def server_auth(self, password_requested: bool = False):
+        if password_requested and not self.password:
+            return
+        self.auth = self.slot_name
+        await self.send_connect(game="")
+
+    def on_print_json(self, args: dict):
+        pass   # the tracked slots already deliver the room's messages
+
+    def on_package(self, cmd: str, args: dict):
+        if cmd == "Connected":
+            self.locked_slots = [str(n) for n in ((args.get("slot_data") or {}).get("locked_slots") or [])]
+            self.known = True
+            self.report()
+        elif cmd == "ReceivedItems" and self.known:
+            self.report()
+
+    def unlocked(self) -> set[str]:
+        names = {self.item_names.lookup_in_slot(i.item, self.slot) for i in list(self.items_received)}
+        return {n[len("Unlock "):] for n in names if isinstance(n, str) and n.startswith("Unlock ")}
+
+    def report(self) -> None:
+        open_now = self.unlocked()
+        self.engine.on_locks(self.room, self.slot_name,
+                             [n for n in self.locked_slots if n not in open_now],
+                             sorted(n for n in self.locked_slots if n in open_now))
 
 
 class ProbeContext(CommonContext):
@@ -837,6 +924,9 @@ class Engine:
         self.clients: set = set()
         self.last: dict[str, dict] = {}
         self.yaml_worlds: dict[str, Any] = {}
+        self.own_yaml_worlds: dict[tuple, Any] = {}   # (folder, slot name) -> core built from that player's YAML
+        self.lock_watchers: dict[tuple, LockWatcher] = {}   # (room, SlotLock slot name) -> its watcher
+        self.locks: dict[tuple, dict] = {}                  # (room, SlotLock slot name) -> last "locks" message
         self.feed: dict[str, deque] = {}            # room -> recent messages (sent to the app when it connects)
         self.feed_recent: dict[str, dict] = {}      # room -> message key -> (time, slots that delivered it)
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="apmt-logic")
@@ -874,6 +964,92 @@ class Engine:
             core.run_generator(None, None)
             self.yaml_worlds[key] = core
         return self.yaml_worlds[key]
+
+    def own_yaml_world(self, folder: str, slot_name: str):
+        """Worker thread: generate from only the YAML(s) whose name is this slot's, copied to a private folder
+        (the user's folder is never changed). Used when the folder as a whole can't be generated."""
+        import tempfile
+        import yaml as pyyaml
+        from Generate import read_weights_yamls
+        base = folder
+        if not base:
+            from worlds.tracker import TrackerWorld
+            base = str(object.__getattribute__(TrackerWorld.settings, "player_files_path").resolve())
+        key = (os.path.normcase(os.path.abspath(base)), slot_name.casefold())
+        if key in self.own_yaml_worlds:
+            return self.own_yaml_worlds[key]
+        TrackerCore = _ut()[0]
+        core = TrackerCore(log, False, False)
+        docs = []
+        if os.path.isdir(base):
+            for entry in os.scandir(base):
+                if not entry.is_file() or entry.name.startswith(".") or entry.name.lower().endswith(".ini"):
+                    continue
+                try:
+                    for doc in read_weights_yamls(entry.path):
+                        if isinstance(doc, dict) and str(doc.get("name", "")).strip().casefold() == slot_name.casefold():
+                            docs.append(doc)
+                except Exception:
+                    continue   # unreadable files are someone else's problem here
+        if not docs:
+            core.gen_error = f"No YAML with name: {slot_name} in {base}"
+        else:
+            private = tempfile.mkdtemp(prefix="apmt-yaml-")
+            with open(os.path.join(private, "player.yaml"), "w", encoding="utf-8") as f:
+                pyyaml.safe_dump_all(docs, f, allow_unicode=True, sort_keys=False)
+            core.player_folder_override = private
+            log.info(f"Generating from {slot_name}'s YAML only")
+            core.run_generator(None, None)
+        self.own_yaml_worlds[key] = core
+        return core
+
+    # ---- SlotLock
+
+    def ensure_lock_watchers(self, ctx: "SlotContext") -> None:
+        """A tracked slot just connected: watch every SlotLock player in its room (once per room)."""
+        for slot, info in list(ctx.slot_info.items()):
+            if slot <= 0 or info.game != SLOTLOCK_GAME:
+                continue
+            key = (ctx.room, info.name)
+            if key in self.lock_watchers:
+                continue
+            log.info(f"{ctx.room}: watching SlotLock player {info.name}")
+            watcher = LockWatcher(self, ctx.room, ctx.requested_server, info.name, ctx.password)
+            self.lock_watchers[key] = watcher
+            watcher.server_task = asyncio.create_task(server_loop(watcher), name=f"slotlock {info.name}")
+
+    def on_locks(self, room: str, slotlock: str, locked: list[str], unlocked: list[str]) -> None:
+        message = {"type": "locks", "room": room, "slotlock": slotlock, "locked": locked, "unlocked": unlocked}
+        if self.locks.get((room, slotlock)) == message:
+            return
+        self.locks[(room, slotlock)] = message
+        self.emit(message)
+        for ctx in self.slots.values():   # a tracked SlotLock slot shows the same summary
+            if ctx.room == room and ctx.slot_name == slotlock and ctx.slot is not None:
+                self.send_slotlock_summary(ctx)
+
+    def send_slotlock_summary(self, ctx: "SlotContext") -> None:
+        state = self.locks.get((ctx.room, ctx.slot_name)) or {"locked": [], "unlocked": []}
+        self.send_snapshot(ctx.sid, {
+            "type": "slot", "id": ctx.sid, "status": "tracking", "message": "", "game": SLOTLOCK_GAME,
+            "slot_name": ctx.slot_name, "slot": ctx.slot, "seed": ctx.persist_id,
+            "checked": len(ctx.checked_locations), "total": len(ctx.checked_locations | ctx.missing_locations),
+            "in_logic": 0, "glitched": 0, "hinted": 0, "ignored": 0, "go_mode": "no", "goal": False,
+            "locations": [], "items": [], "events": [], "entrances": [], "hints": [], "errors": [],
+            "warning": "", "slotlock": {"locked": state["locked"], "unlocked": state["unlocked"]},
+        })
+
+    async def stop_lock_watchers(self, room: str) -> None:
+        """Nothing in this room is tracked any more."""
+        if any(c.room == room for c in self.slots.values()):
+            return
+        for key in [k for k in self.lock_watchers if k[0] == room]:
+            watcher = self.lock_watchers.pop(key)
+            self.locks.pop(key, None)
+            try:
+                await watcher.shutdown()
+            except Exception:
+                log.error(traceback.format_exc())
 
     def emit(self, message: dict) -> None:
         if message.get("type") == "slot":
@@ -960,6 +1136,8 @@ class Engine:
             await ws.send(json.dumps(self.last.get(ctx.sid) or ctx.status_payload()))
         for room, messages in self.feed.items():
             await ws.send(json.dumps({"type": "feed_backlog", "room": room, "messages": list(messages)}))
+        for message in list(self.locks.values()):
+            await ws.send(json.dumps(message))
         try:
             async for raw in ws:
                 msg = None
@@ -1080,6 +1258,7 @@ class Engine:
             log.info(f"Stopped tracking {ctx.slot_name}")
             await ctx.stop()
             self.emit({"type": "removed", "id": sid})
+            await self.stop_lock_watchers(ctx.room)
 
     async def refresh(self, sid: Optional[str]):
         """Re-read YAMLs and rebuild logic (for one slot, or all of them)."""
@@ -1087,6 +1266,7 @@ class Engine:
         for ctx in targets:
             key = os.path.normcase(os.path.abspath(ctx.yaml_folder)) if ctx.yaml_folder else ""
             self.yaml_worlds.pop(key, None)
+        self.own_yaml_worlds.clear()
         for ctx in targets:
             if ctx.slot is not None and ctx.server and not ctx.server.socket.closed:
                 self.spawn(ctx._initialize(rebuild=True), f"init {ctx.sid}")

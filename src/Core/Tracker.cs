@@ -162,7 +162,24 @@ public sealed class SlotView : INotifyPropertyChanged
     public string GoMode { get; private set; } = "no";
     /// <summary>The slot has reported its goal as complete (client status GOAL).</summary>
     public bool Goal { get; private set; }
-    public bool ShowCount => !Goal;
+    public bool ShowCount => !Goal && !Locked && !IsSlotLock;
+
+    /// <summary>Locked by a SlotLock player: nothing in this game counts as in logic until its unlock item arrives.</summary>
+    public bool Locked { get; private set; }
+    /// <summary>This slot is a SlotLock player (nothing to track; it shows which games it has unlocked).</summary>
+    public bool IsSlotLock { get; private set; }
+    public IReadOnlyList<string> SlotLockLocked { get; private set; } = Array.Empty<string>();
+    public IReadOnlyList<string> SlotLockUnlocked { get; private set; } = Array.Empty<string>();
+    private JsonObject? _lastSnapshot;
+
+    /// <summary>Called when the room's SlotLock state changes; re-applies the last snapshot with or without the lock.</summary>
+    public void SetLocked(bool locked)
+    {
+        if (locked == Locked) return;
+        Locked = locked;
+        if (_lastSnapshot != null) ApplySnapshot(_lastSnapshot);
+        else NotifyAll();
+    }
     /// <summary>The room auto-releases on goal, so a goaled slot's remaining checks have been sent out.</summary>
     public bool AutoRelease { get; private set; }
     public bool Released => Goal && AutoRelease;
@@ -217,10 +234,11 @@ public sealed class SlotView : INotifyPropertyChanged
     public string CheckedText => Total > 0 ? $"{Checked}/{Total}" : "–";
     public string PercentText => Total > 0 ? $"{Progress * 100:0}%" : "";
     /// <summary>"BK": nothing in logic and the goal isn't reachable either (so not goaled and not in go mode).</summary>
-    public bool IsBK => HasData && ToDo == 0 && !Goal && GoMode != "yes";
-    public string InLogicText => IsBK ? "BK" : HasData ? ToDo.ToString() : "–";
+    public bool IsBK => HasData && ToDo == 0 && !Goal && GoMode != "yes" && !Locked && !IsSlotLock;
+    public string InLogicText => IsBK ? "BK" : Locked || IsSlotLock ? "" : HasData ? ToDo.ToString() : "–";
     public Brush InLogicBrush => IsBK ? Brushes2.Danger : Brushes2.InLogic;
-    public string InLogicTip => IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete"
+    public string InLogicTip => Locked ? $"Locked by SlotLock until “Unlock {SlotName}” arrives"
+                              : IsBK ? "BK: nothing in logic right now" : Goal ? "Goal complete"
                               : Entrances > 0 ? $"{InLogic} {(InLogic == 1 ? "check" : "checks")} in logic + {Entrances} new {(Entrances == 1 ? "entrance" : "entrances")}"
                               : "Checks in logic";
     public string ToDoTip => HasManual ? InLogicTip + $" (pretending to have {ManualItems.Count} {(ManualItems.Count == 1 ? "item" : "items")})" : InLogicTip;
@@ -228,18 +246,25 @@ public sealed class SlotView : INotifyPropertyChanged
     public bool IsGoMode => GoMode == "yes";
     /// <summary>Show the go mode pill: the goal can be reached now (in logic, or with glitches), like UT's "Go mode"
     /// header. Once the goal is done the same pill says GOALED.</summary>
-    public bool HasGoMode => HasData && (Goal || GoMode is "yes" or "glitched");
-    public bool IsGoGlitched => !Goal && GoMode == "glitched";
-    public string GoModeText => Goal ? "GOALED" : GoMode switch { "yes" => "GO MODE", "glitched" => "GO MODE (GLITCHED)", _ => "" };
-    public string GoModeShort => Goal ? "GOALED" : "GO MODE";
-    public string GoModeTip => Released ? "Goal complete. This room releases on goal, so the remaining checks were sent out"
+    public bool HasGoMode => HasData && (Goal || Locked || IsSlotLock || GoMode is "yes" or "glitched");
+    public bool IsGoGlitched => !Goal && !Locked && !IsSlotLock && GoMode == "glitched";
+    /// <summary>The pill is grey (not green) for LOCKED and for a SlotLock player's summary.</summary>
+    public bool IsGreyPill => (Locked || IsSlotLock) && !Goal;
+    public string GoModeText => Goal ? "GOALED" : Locked ? "LOCKED" : IsSlotLock ? SlotLockSummary
+                              : GoMode switch { "yes" => "GO MODE", "glitched" => "GO MODE (GLITCHED)", _ => "" };
+    public string GoModeShort => Goal ? "GOALED" : Locked ? "LOCKED" : IsSlotLock ? SlotLockSummary : "GO MODE";
+    public string SlotLockSummary => $"{SlotLockUnlocked.Count}/{SlotLockUnlocked.Count + SlotLockLocked.Count} UNLOCKED";
+    public string GoModeTip => Locked && !Goal ? $"Locked by SlotLock: none of this game's checks are in logic until “Unlock {SlotName}” arrives"
+                             : IsSlotLock ? (SlotLockLocked.Count == 0 ? "Every game it locks is unlocked"
+                                             : "Still locked: " + string.Join(", ", SlotLockLocked))
+                             : Released ? "Goal complete. This room releases on goal, so the remaining checks were sent out"
                              : Goal ? "Goal complete. This room doesn't release on goal: the remaining checks stay until the host releases them"
                              : GoMode == "glitched" ? "Your goal can be reached, but only with glitches"
                              : "Everything needed to finish this game is in logic";
 
     public string StatusText => Status switch
     {
-        "tracking" => Released ? "Goaled" : IsDone ? "All checks done" : $"{InLogic} in logic",
+        "tracking" => Locked ? "Locked by SlotLock" : IsSlotLock ? SlotLockSummary : Released ? "Goaled" : IsDone ? "All checks done" : $"{InLogic} in logic",
         "connecting" => "Connecting…",
         "generating" => "Building logic…",
         "reconnecting" => "Reconnecting…",
@@ -278,7 +303,14 @@ public sealed class SlotView : INotifyPropertyChanged
 
     public void ApplySnapshot(JsonObject m)
     {
+        _lastSnapshot = m;
         ApplyStatus(m);
+        if (m["slotlock"] is JsonObject lockInfo)
+        {
+            IsSlotLock = true;
+            SlotLockLocked = (lockInfo["locked"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0).ToList() ?? new List<string>();
+            SlotLockUnlocked = (lockInfo["unlocked"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0).ToList() ?? new List<string>();
+        }
         SlotNumber = (int)Json.Long(m["slot"]);
         Checked = (int)Json.Long(m["checked"]);
         Total = (int)Json.Long(m["total"]);
@@ -333,6 +365,13 @@ public sealed class SlotView : INotifyPropertyChanged
                     // Negative ids keep them apart from locations; explain / path look at the room the entrance is in.
                     locs.Add(new CheckItem(-1 - (name.GetHashCode() & 0x3FFFFFFF), name, region, "entrance", false, null, region));
                 }
+        if (Locked)
+        {
+            // Locked by SlotLock: nothing is reachable yet, whatever the game's own logic says.
+            locs = locs.Where(l => !l.IsEntrance)
+                       .Select(l => l.IsInLogic || l.IsGlitched ? l with { Status = "out_of_logic" } : l).ToList();
+            GoMode = "no";
+        }
         Entrances = locs.Count(l => l.IsEntrance);
         // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
         InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);
@@ -411,6 +450,10 @@ public sealed class LiveWorld
     public List<SlotView> Slots { get; } = new();
     public ObservableCollection<FeedMessage> Feed { get; } = new();
     public LiveWorld(Multiworld world) => World = world;
+
+    /// <summary>Each SlotLock player's still-locked slot names (a room can have more than one SlotLock player).</summary>
+    public Dictionary<string, HashSet<string>> Locks { get; } = new();
+    public bool IsLocked(string slotName) => Locks.Values.Any(l => l.Contains(slotName));
 
     public int InLogic => Slots.Sum(s => s.ToDo);
     public bool HasData => Slots.Any(s => s.HasData);
@@ -612,6 +655,36 @@ public sealed class TrackerStore
     public System.Threading.Tasks.Task SetHiddenAsync(SlotView slot, IEnumerable<long> ids, bool hidden) =>
         _engine.Client.SetIgnoredAsync(slot.Ref.Id, ids.ToArray(), hidden);
 
+    // ------------------------------------------------------------------ SlotLock
+
+    internal void ApplyLocks(JsonObject m)
+    {
+        string? room = m["room"]?.GetValue<string>();
+        string slotlock = m["slotlock"]?.GetValue<string>() ?? "";
+        if (room == null || !_live.TryGetValue(room, out var live)) return;
+        bool firstReport = !live.Locks.ContainsKey(slotlock);
+        live.Locks[slotlock] = new HashSet<string>(
+            (m["locked"] as JsonArray)?.Select(n => n?.GetValue<string>() ?? "").Where(n => n.Length > 0) ?? Enumerable.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);   // the slot name typed into the app may differ in case
+        foreach (var slot in live.Slots)
+        {
+            bool was = slot.Locked;
+            slot.SetLocked(live.IsLocked(slot.SlotName));
+            if (was && !slot.Locked && !firstReport)
+                AddFeed(room, new JsonObject
+                {
+                    ["kind"] = "Text",
+                    ["time"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
+                    ["segments"] = new JsonArray(
+                        new JsonObject { ["text"] = $"{slot.SlotName} ({slot.Title}) is " },
+                        new JsonObject { ["text"] = "UNLOCKED", ["color"] = "green" },
+                        new JsonObject { ["text"] = "!" }),
+                    ["players"] = new JsonArray(),
+                });
+        }
+        Changed?.Invoke(null);
+    }
+
     // ------------------------------------------------------------------ engine messages
 
     private void OnMessage(JsonObject m)
@@ -619,6 +692,7 @@ public sealed class TrackerStore
         string type = m["type"]?.GetValue<string>() ?? "";
         if (type == "error") { Log.Warn("engine", m["message"]?.GetValue<string>() ?? ""); return; }
         if (type == "feed") { AddFeed(m["room"]?.GetValue<string>(), m); return; }
+        if (type == "locks") { ApplyLocks(m); return; }
         if (type == "feed_backlog")
         {
             string? room = m["room"]?.GetValue<string>();

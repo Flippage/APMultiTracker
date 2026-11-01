@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.11.2
+
+- **SlotLock support** (engine v0.4.11): in a room with a SlotLock player, games it has locked show **LOCKED** instead
+  of a number, count nothing as in logic (their checks only show under **All remaining**), and stay out of the
+  All games total, until the SlotLock player receives their **Unlock** item. The game then unlocks by itself and the
+  feed says so. Tracking the SlotLock slot itself shows how many games it has unlocked instead of an error.
+- **One broken YAML no longer breaks every game**: games that need a YAML are built from all the YAMLs
+  in the folder together, so one YAML that couldn't be loaded (for example one needing a newer Archipelago, or one
+  excluding a location the tracker can't find) used to stop every one of them. Now each game falls back to being built
+  from just its own player's YAML, with a notice saying which YAML was the problem. Your YAML folder isn't changed.
+- Works with more versions of Universal Tracker, tested with v0.2.30, v0.3.0, v0.3.4 and the latest v0.3.8:
+  - Fix: with Universal Tracker older than v0.2.34, every game failed with "'TrackerCore' object has no attribute
+    'tracker_disabled'".
+  - Fix: **Logical path** failed with Universal Tracker v0.3.5 and newer, and with versions older than v0.3.3.
+
 ## v0.11.1
 
 - **All games: Glitched switch**: next to Group by region, turn off **Glitched** to list only the checks that are in

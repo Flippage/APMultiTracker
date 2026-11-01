@@ -205,12 +205,13 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FPercent.Text = (s.Progress * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
         FBar.ScaleX = s.Progress;
         FBarFill.Background = s.Goal ? Brushes2.InLogic : Brushes2.Accent;
-        FInLogicChip.Visibility = s.Released ? Visibility.Collapsed : Visibility.Visible;   // nothing left to do
+        FInLogicChip.Visibility = s.Released || s.Locked || s.IsSlotLock ? Visibility.Collapsed : Visibility.Visible;   // nothing to do
         FGoChip.Visibility = s.HasGoMode ? Visibility.Visible : Visibility.Collapsed;
         FGo.Text = s.GoModeText;
         FGoChip.ToolTip = s.GoModeTip;
-        FGoChip.Background = (Brush)FindResource(s.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
-        FGoChip.BorderBrush = FGo.Foreground = (Brush)FindResource(s.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
+        FGoChip.Background = s.IsGreyPill ? new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x26))
+                           : (Brush)FindResource(s.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
+        FGoChip.BorderBrush = FGo.Foreground = (Brush)FindResource(s.IsGreyPill ? "Text2Brush" : s.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
         FHiddenPill.Content = s.Hidden > 0 ? $"Hidden ({s.Hidden})" : "Hidden";
         UnhideAllBtn.Visibility = App.Config.Filter == CheckFilter.Hidden && s.Hidden > 0 ? Visibility.Visible : Visibility.Collapsed;
         FHintPill.Content = s.Hinted > 0 ? $"Hinted ({s.Hinted})" : "Hinted";
@@ -276,6 +277,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         {
             (ListEmptyTitle.Text, ListEmptySub.Text) =
                 q.Length > 0 ? ("No matches", "Nothing matches your search.")
+                : s.Locked ? ("Locked by SlotLock", $"None of this game's checks are in logic until the SlotLock player receives “Unlock {s.SlotName}”. Try “All remaining” to see what's waiting.")
+                : s.IsSlotLock ? ("SlotLock", (s.SlotLockUnlocked.Count > 0 ? "Unlocked: " + string.Join(", ", s.SlotLockUnlocked) + "\n" : "")
+                                              + (s.SlotLockLocked.Count > 0 ? "Still locked: " + string.Join(", ", s.SlotLockLocked) : "Every game it locks is unlocked."))
                 : s.Released ? ("Goaled!", "This room releases on goal, so the remaining checks were sent to the other players.")
                 : s.IsDone ? ("Every check is done!", "This game has nothing left.")
                 : filter switch
@@ -1260,8 +1264,32 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         RefreshList();
         SelfTestDropdown();
         SelfTestOverviewGlitched();
+        SelfTestSlotLock();
         App.Tracker.SetFocus(null);
         UpdateLayout();
+    }
+
+    /// <summary>Self-test: a game locked by SlotLock counts nothing as in logic; unlocking brings its checks back.</summary>
+    private void SelfTestSlotLock()
+    {
+        var slot = App.Tracker.Slots.First(s => s.InLogic > 0);
+        int before = slot.ToDo;
+        string room = App.Tracker.Live.First(l => l.Slots.Contains(slot)).World.Id;
+        System.Text.Json.Nodes.JsonObject Locks(params string[] locked) => new()
+        {
+            ["type"] = "locks", ["room"] = room, ["slotlock"] = "SelfTestLocker",
+            ["locked"] = new System.Text.Json.Nodes.JsonArray(locked.Select(n => (System.Text.Json.Nodes.JsonNode)n).ToArray()),
+            ["unlocked"] = new System.Text.Json.Nodes.JsonArray(),
+        };
+        App.Tracker.ApplyLocks(Locks(slot.SlotName));
+        if (!slot.Locked || slot.ToDo != 0 || slot.Overview.Count != 0 || slot.GoModeShort != "LOCKED" || slot.IsBK)
+            throw new InvalidOperationException("A SlotLock-locked game still counts checks (or isn't shown as LOCKED).");
+        int feedBefore = App.Tracker.Live.First(l => l.World.Id == room).Feed.Count;
+        App.Tracker.ApplyLocks(Locks());
+        if (slot.Locked || slot.ToDo != before)
+            throw new InvalidOperationException("Unlocking a SlotLock-locked game didn't bring its checks back.");
+        if (App.Tracker.Live.First(l => l.World.Id == room).Feed.Count != feedBefore + 1)
+            throw new InvalidOperationException("Unlocking a game didn't say so in the feed.");
     }
 
     /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>

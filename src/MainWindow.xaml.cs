@@ -189,13 +189,13 @@ public partial class MainWindow : Window
             Art.SetUrl(FocusArt, f.ArtUrl);
             FocusCollage.Visibility = Visibility.Collapsed;
             FocusArtIdle.Visibility = string.IsNullOrEmpty(f.ArtUrl) ? Visibility.Visible : Visibility.Collapsed;
-            FocusCount.Text = f.Goal ? "GOALED" : f.InLogicText;
-            FocusCount.Foreground = f.InLogicBrush;
-            FocusCountLabel.Text = f.IsBK || f.Goal ? "" : " in logic";
+            FocusCount.Text = f.Goal ? "GOALED" : f.Locked ? "LOCKED" : f.IsSlotLock ? f.SlotLockSummary.Replace(" UNLOCKED", "") : f.InLogicText;
+            FocusCount.Foreground = f.Locked ? (Brush)FindResource("Text2Brush") : f.InLogicBrush;
+            FocusCountLabel.Text = f.IsSlotLock ? " unlocked" : f.IsBK || f.Goal || f.Locked ? "" : " in logic";
             FocusBarScale.ScaleX = f.Progress;
             FocusBar.Background = f.Goal ? Brushes2.InLogic : Brushes2.Accent;
             FocusChecked.Text = f.HasData ? $"{f.Checked} / {f.Total} checked · {f.PercentText}" : f.StatusDetail;
-            GoTag.Visibility = f.HasGoMode && !f.Goal ? Visibility.Visible : Visibility.Collapsed;
+            GoTag.Visibility = f.HasGoMode && !f.Goal && !f.Locked && !f.IsSlotLock ? Visibility.Visible : Visibility.Collapsed;
             GoText.Text = f.IsGoGlitched ? "GO (GLITCHED)" : "GO MODE";
             GoTag.Background = (Brush)FindResource(f.IsGoGlitched ? "WarnBgBrush" : "InLogicDimBrush");
             GoText.Foreground = (Brush)FindResource(f.IsGoGlitched ? "GlitchedBrush" : "InLogicBrush");
