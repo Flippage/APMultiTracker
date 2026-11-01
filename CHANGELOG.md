@@ -5,6 +5,11 @@
 - **All games: unlocked games first**: in a room with a SlotLock player, the columns of games that are still
   **LOCKED** move to the right, so the games you can play sit side by side on the left instead of being spread out
   between locked ones. A game moves over by itself as soon as it unlocks. Without SlotLock the order is unchanged.
+- **CrossCode: uses the room's botanics amount** (engine v0.4.12): a YAML with a random **Botanics Completion
+  Amount** is no longer rolled again when the tracker rebuilds the game. The tracker takes the room's real amount
+  instead, so the Crocus Pocus quest is in logic at the right time, and a roll over 77 without the DLC can't stop
+  CrossCode from loading any more ("Cannot have more than 77 botanics chests required without DLC"). Your YAML
+  file isn't changed.
 - Fix (engine v0.4.12): when a game's YAML only fails alongside the others in the folder but works on its own, its
   notice blamed "another YAML". It now says the game couldn't be built together with the other YAMLs and was built
   from its own YAML. Notices also name whose YAML failed and in which step, without Python's object addresses, and

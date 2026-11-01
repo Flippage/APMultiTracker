@@ -115,6 +115,34 @@ def describe_gen_error(text: str) -> tuple[str, str]:
     return name, reason + (f": {causes[-1]}" if causes else "")
 
 
+def _crosscode_options(slot_data: dict) -> dict:
+    opts = slot_data.get("options") or {}
+    out = {}
+    if isinstance(opts.get("botanicsCompletionAmount"), int):
+        # Rolled from a range when the room was made; re-rolling it can exceed what the game allows without the DLC
+        # (the apworld then refuses the YAML) or just differ from the room's real value.
+        out["botanics_completion_amount"] = opts["botanicsCompletionAmount"]
+    return out
+
+
+# Per game: YAML options to take from the room's slot data instead of re-rolling them from the YAML.
+# Each returns {option name: value}; it's only applied to this slot's own YAML.
+SLOT_DATA_OPTIONS: dict[str, Callable[[dict], dict]] = {
+    "CrossCode": _crosscode_options,
+}
+
+
+def slot_data_options(game: str, slot_data: dict) -> dict:
+    fn = SLOT_DATA_OPTIONS.get(game)
+    if fn is None or not isinstance(slot_data, dict):
+        return {}
+    try:
+        return fn(slot_data)
+    except Exception:
+        log.warning(f"Couldn't read {game}'s options from its slot data", exc_info=True)
+        return {}
+
+
 # ---------------------------------------------------------------------------------------------- slots
 
 class SlotContext(CommonContext):
@@ -311,11 +339,17 @@ class SlotContext(CommonContext):
         core.set_slot_params(game, self.slot, slot_name, self.team)
         own_yaml_note = own_error = ""
         if not getattr(world_cls, "ut_can_gen_without_yaml", False):
-            shared = self.engine.yaml_world(self.yaml_folder)
+            # Options the room already rolled are taken from its slot data, so the rebuild matches the real game.
+            fixed = slot_data_options(game, slot_data)
+            if fixed:
+                log.info(f"{slot_name}: using the room's {', '.join(f'{k}={v}' for k, v in fixed.items())}")
+                shared = self.engine.patched_yaml_world(self.yaml_folder, slot_name, game, fixed, only_own=False)
+            else:
+                shared = self.engine.yaml_world(self.yaml_folder)
             if shared.launch_multiworld is None:
                 # Someone else's YAML can break the whole folder (a newer Archipelago, an option this rebuild can't
                 # apply...). Build this game from just its own player's YAML instead.
-                own = self.engine.own_yaml_world(self.yaml_folder, slot_name)
+                own = self.engine.patched_yaml_world(self.yaml_folder, slot_name, game, fixed, only_own=True)
                 if own.launch_multiworld is not None:
                     log.info(f"{slot_name}: the YAML folder couldn't be loaded as a whole; using just {slot_name}'s YAML")
                     culprit, reason = describe_gen_error(shared.gen_error)
@@ -998,9 +1032,11 @@ class Engine:
             self.yaml_worlds[key] = core
         return self.yaml_worlds[key]
 
-    def own_yaml_world(self, folder: str, slot_name: str):
-        """Worker thread: generate from only the YAML(s) whose name is this slot's, copied to a private folder
-        (the user's folder is never changed). Used when the folder as a whole can't be generated."""
+    def patched_yaml_world(self, folder: str, slot_name: str, game: str, fixed: dict, only_own: bool):
+        """Worker thread: generate from a private copy of the YAML folder (the user's folder is never changed).
+        only_own: just the YAML(s) whose name is this slot's (used when the folder as a whole can't be generated);
+        otherwise every file, as the folder would be. `fixed` sets options in this slot's own YAML for its game."""
+        import shutil
         import tempfile
         import yaml as pyyaml
         from Generate import read_weights_yamls
@@ -1008,30 +1044,54 @@ class Engine:
         if not base:
             from worlds.tracker import TrackerWorld
             base = str(object.__getattribute__(TrackerWorld.settings, "player_files_path").resolve())
-        key = (os.path.normcase(os.path.abspath(base)), slot_name.casefold())
+        key = (os.path.normcase(os.path.abspath(base)), slot_name.casefold(), only_own,
+               tuple(sorted((k, repr(v)) for k, v in fixed.items())))
         if key in self.own_yaml_worlds:
             return self.own_yaml_worlds[key]
         TrackerCore = _ut()[0]
         core = TrackerCore(log, False, False)
-        docs = []
+
+        def is_own(doc) -> bool:
+            return isinstance(doc, dict) and str(doc.get("name", "")).strip().casefold() == slot_name.casefold()
+
+        def patch(doc: dict) -> dict:
+            section = doc.get(game)
+            if fixed and isinstance(section, dict):
+                doc[game] = {**section, **fixed}
+            return doc
+
+        private = tempfile.mkdtemp(prefix="apmt-yaml-")
+        found = 0
         if os.path.isdir(base):
             for entry in os.scandir(base):
-                if not entry.is_file() or entry.name.startswith(".") or entry.name.lower().endswith(".ini"):
+                if not entry.is_file() or entry.name.startswith("."):
                     continue
-                try:
-                    for doc in read_weights_yamls(entry.path):
-                        if isinstance(doc, dict) and str(doc.get("name", "")).strip().casefold() == slot_name.casefold():
-                            docs.append(doc)
-                except Exception:
-                    continue   # unreadable files are someone else's problem here
-        if not docs:
+                docs = None
+                if not entry.name.lower().endswith(".ini"):
+                    try:
+                        docs = list(read_weights_yamls(entry.path))
+                    except Exception:
+                        docs = None   # unreadable: copied as it is (only_own: someone else's problem)
+                own = [d for d in docs or [] if is_own(d)]
+                found += len(own)
+                if only_own:
+                    if own:
+                        with open(os.path.join(private, f"player{found}.yaml"), "w", encoding="utf-8") as f:
+                            pyyaml.safe_dump_all([patch(d) for d in own], f, allow_unicode=True, sort_keys=False)
+                elif own and fixed:
+                    with open(os.path.join(private, entry.name), "w", encoding="utf-8") as f:
+                        pyyaml.safe_dump_all([patch(d) if is_own(d) else d for d in docs], f,
+                                             allow_unicode=True, sort_keys=False)
+                else:
+                    shutil.copy2(entry.path, os.path.join(private, entry.name))
+        if only_own and not found:
             core.gen_error = f"No YAML with name: {slot_name} in {base}"
+        elif not os.path.isdir(base):
+            core.gen_error = f"Folder not found: {base}"
         else:
-            private = tempfile.mkdtemp(prefix="apmt-yaml-")
-            with open(os.path.join(private, "player.yaml"), "w", encoding="utf-8") as f:
-                pyyaml.safe_dump_all(docs, f, allow_unicode=True, sort_keys=False)
             core.player_folder_override = private
-            log.info(f"Generating from {slot_name}'s YAML only")
+            log.info(f"Generating from {slot_name}'s YAML only" if only_own else
+                     f"Generating from YAMLs in {base} with {slot_name}'s options from the room")
             core.run_generator(None, None)
         self.own_yaml_worlds[key] = core
         return core
