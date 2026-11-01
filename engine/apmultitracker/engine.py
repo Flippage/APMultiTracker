@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import time
 import traceback
@@ -88,6 +89,30 @@ def apply_host_settings(core) -> None:
 def last_line(text: str) -> str:
     lines = [line.strip() for line in (text or "").strip().splitlines() if line.strip()]
     return lines[-1] if lines else ""
+
+
+_STEP_FAILED = re.compile(r"Exception in <bound method (\w+?)(?:World)?\.(\w+) of .*?> for player \d+, named (.+?)\.?$")
+_EXC_LINE = re.compile(r"^[A-Za-z_][\w.]*(?:Error|Exception|Exit|Interrupt)\b")
+
+
+def describe_gen_error(text: str) -> tuple[str, str]:
+    """(slot name, readable reason) for a generation error. Archipelago wraps a world's failure as
+    "Exception in <bound method CrossCodeWorld.generate_early of <...>> for player 2, named X."; this turns that into
+    ("X", "CrossCode's generate_early step failed") plus the underlying error when the traceback has it.
+    For any other error the slot name is "" and the reason is the error's last line."""
+    last = last_line(text)
+    m = _STEP_FAILED.search(last)
+    if not m:
+        return "", last
+    world, step, name = m.group(1), m.group(2), m.group(3).strip()
+    # The real cause is the exception line before the wrapper (tracebacks list the cause first).
+    causes = []
+    for line in (text or "").splitlines():
+        e = _EXC_LINE.match(line) if line and not line[0].isspace() else None
+        if e and "Exception in <bound method" not in line:
+            causes.append(line.strip())
+    reason = f"{world}'s {step} step failed"
+    return name, reason + (f": {causes[-1]}" if causes else "")
 
 
 # ---------------------------------------------------------------------------------------------- slots
@@ -293,8 +318,16 @@ class SlotContext(CommonContext):
                 own = self.engine.own_yaml_world(self.yaml_folder, slot_name)
                 if own.launch_multiworld is not None:
                     log.info(f"{slot_name}: the YAML folder couldn't be loaded as a whole; using just {slot_name}'s YAML")
-                    own_yaml_note = (f"Another YAML in the folder couldn't be loaded ({last_line(shared.gen_error)}), "
-                                     f"so {game} was built from {slot_name}'s YAML on its own.")
+                    culprit, reason = describe_gen_error(shared.gen_error)
+                    if culprit.casefold() == slot_name.casefold():
+                        # Its own YAML fails alongside the others but works alone (a world that doesn't cope with
+                        # other players in the same generation), so nobody else's YAML is to blame.
+                        own_yaml_note = (f"{game} couldn't be built together with the other YAMLs in the folder "
+                                         f"({reason}), so it was built from {slot_name}'s YAML on its own.")
+                    else:
+                        who = f"{culprit}'s YAML" if culprit else "Another YAML in the folder"
+                        own_yaml_note = (f"{who} couldn't be loaded ({reason}), "
+                                         f"so {game} was built from {slot_name}'s YAML on its own.")
                     shared = own
                 else:
                     own_error = last_line(own.gen_error)

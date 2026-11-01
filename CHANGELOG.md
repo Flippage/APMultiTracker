@@ -5,6 +5,10 @@
 - **All games: unlocked games first**: in a room with a SlotLock player, the columns of games that are still
   **LOCKED** move to the right, so the games you can play sit side by side on the left instead of being spread out
   between locked ones. A game moves over by itself as soon as it unlocks. Without SlotLock the order is unchanged.
+- Fix (engine v0.4.12): when a game's YAML only fails alongside the others in the folder but works on its own, its
+  notice blamed "another YAML". It now says the game couldn't be built together with the other YAMLs and was built
+  from its own YAML. Notices also name whose YAML failed and in which step, without Python's object addresses, and
+  give the underlying error when there is one.
 
 ## v0.11.2
 
