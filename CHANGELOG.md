@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.1
+
+- **All games: Glitched switch**: next to Group by region, turn off **Glitched** to list only the checks that are in
+  logic in every game's column (like leaving out **+ Glitched** in a single game). Remembered; on by default.
+- Fix: the **Retry** button on a game's error message looked like an oval rather than a pill.
+
 ## v0.11.0
 
 - **Hint shop** (engine v0.4.8): a **Hints** toggle next to Items and Explain opens a panel for the focused game:

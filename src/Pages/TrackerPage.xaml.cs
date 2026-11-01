@@ -73,6 +73,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         _syncing = true;
         GroupToggle.IsChecked = App.Config.GroupByRegion;
         OverviewGroupToggle.IsChecked = App.Config.OverviewGroupByRegion;
+        OverviewGlitchedToggle.IsChecked = App.Config.OverviewShowGlitched;
         ItemsToggle.IsChecked = App.Config.ShowItems;
         ExplainToggle.IsChecked = App.Config.ShowExplain;
         HintsToggle.IsChecked = App.Config.ShowHints;
@@ -170,6 +171,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                 rb.IsChecked = item == focused;
         }
     }
+
+    /// <summary>Screenshots: redraw the focused game after changing its state directly.</summary>
+    public void RefreshFocusedForTest() => RefreshFocused();
 
     private void RefreshFocused()
     {
@@ -360,6 +364,15 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         App.Config.OverviewGroupByRegion = OverviewGroupToggle.IsChecked == true;
         App.SaveConfig();
         foreach (var s in App.Tracker.Slots) s.ApplyOverviewGrouping();
+    }
+
+    /// <summary>All games: show or hide the checks you'd need glitches for.</summary>
+    private void OverviewGlitched_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncing) return;
+        App.Config.OverviewShowGlitched = OverviewGlitchedToggle.IsChecked == true;
+        App.SaveConfig();
+        App.Tracker.RefreshViews();
     }
 
     /// <summary>Shrink the game cards (to 130 px, art hidden below 150) before letting them wrap onto a second row.</summary>
@@ -1246,8 +1259,19 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         Search.Text = "";
         RefreshList();
         SelfTestDropdown();
+        SelfTestOverviewGlitched();
         App.Tracker.SetFocus(null);
         UpdateLayout();
+    }
+
+    /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>
+    private void SelfTestOverviewGlitched()
+    {
+        var slot = App.Tracker.Slots.First(s => s.Locations.Any(l => l.IsGlitched));
+        OverviewGlitchedToggle.IsChecked = false;
+        if (slot.Overview.Any(l => l.IsGlitched)) throw new InvalidOperationException("All games still lists glitched checks with Glitched off.");
+        OverviewGlitchedToggle.IsChecked = true;
+        if (!slot.Overview.Any(l => l.IsGlitched)) throw new InvalidOperationException("All games doesn't list glitched checks with Glitched on.");
     }
 
     /// <summary>Self-test: the hint dropdown opens under its box, closes on a click elsewhere or when the window moves.</summary>

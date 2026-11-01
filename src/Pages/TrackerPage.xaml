@@ -338,6 +338,8 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <CheckBox x:Name="OverviewGroupToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}" Content="Group by region"
                       FontSize="12.5" Checked="OverviewGroup_Changed" Unchecked="OverviewGroup_Changed"/>
+            <CheckBox x:Name="OverviewGlitchedToggle" DockPanel.Dock="Right" Style="{StaticResource Toggle}" Content="Glitched"
+                      FontSize="12.5" Margin="0,0,18,0" Checked="OverviewGlitched_Changed" Unchecked="OverviewGlitched_Changed"/>
             <TextBlock Text="IN LOGIC NOW" Style="{StaticResource Caps}" VerticalAlignment="Center"/>
         </DockPanel>
         <ScrollViewer x:Name="OverviewScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
@@ -547,7 +549,7 @@
             <!-- Status / warning -->
             <Border x:Name="FNotice" Grid.Row="1" Margin="0,10,0,0" Padding="14,10" CornerRadius="10" BorderThickness="1" Visibility="Collapsed">
                 <DockPanel>
-                    <Button x:Name="FNoticeBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="32" Padding="14,0"
+                    <Button x:Name="FNoticeBtn" DockPanel.Dock="Right" Style="{StaticResource OutlineButton}" Height="34" Padding="22,0" MinWidth="92"
                             FontSize="12.5" Content="Retry" Click="RefreshOne_Click" VerticalAlignment="Center"/>
                     <TextBlock x:Name="FNoticeText" FontSize="12.5" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 </DockPanel>

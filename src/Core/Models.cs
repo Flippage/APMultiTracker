@@ -35,6 +35,8 @@ public sealed class AppConfig
     public bool GroupByRegion { get; set; } = true;
     public bool ShowRegionNames { get; set; } = true;
     public bool OverviewGroupByRegion { get; set; }
+    /// <summary>All games: also list checks reachable with glitches.</summary>
+    public bool OverviewShowGlitched { get; set; } = true;
     /// <summary>Leave excluded checks out of the lists (like UT's hide_excluded_locations).</summary>
     public bool HideExcluded { get; set; }
     /// <summary>GO MODE notification (Windows toast, or an in-app banner when the app is in front).</summary>

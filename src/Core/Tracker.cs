@@ -202,7 +202,8 @@ public sealed class SlotView : INotifyPropertyChanged
 
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
-        var shown = locs.Where(l => l.Status is "in_logic" or "glitched" or "entrance" && !(l.Excluded && App.Config.HideExcluded));
+        var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" || (l.IsGlitched && App.Config.OverviewShowGlitched))
+                                    && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
                 : shown.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))

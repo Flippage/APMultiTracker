@@ -59,6 +59,7 @@ public static class Demo
             ShowItems = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") is "1" or "items",   // check shots
             ShowEvents = Environment.GetEnvironmentVariable("APMT_SHOT_EVENTS") == "1",
             ShowHints = Environment.GetEnvironmentVariable("APMT_SHOT_HINTS") == "1",
+            OverviewShowGlitched = Environment.GetEnvironmentVariable("APMT_SHOT_NO_GLITCHED") != "1",
         };
     }
 
@@ -252,6 +253,17 @@ public static class Demo
             w.GoToTracker();
             w.ShowGoModeBanner(App.Tracker.Slots[3]);
             await Shot("gomode-banner");
+        }
+        if (Environment.GetEnvironmentVariable("APMT_SHOT_ERROR") == "1")
+        {
+            // Check shot: a game in the error state (the notice with its Retry button).
+            w.GoToTracker();
+            var slot = App.Tracker.Slots[0];
+            App.Tracker.SetFocus(slot);
+            slot.ApplyStatus(new JsonObject { ["status"] = "error", ["message"] =
+                "Minecraft Dig needs your YAML, but the YAMLs in Universal Tracker's Players folder couldn't be loaded: Exception: Settings reports required version of generator is at least 0.6.8, however generator is of version 0.6.7" });
+            w.TrackerView.RefreshFocusedForTest();
+            await Shot("error-notice");
         }
         if (Environment.GetEnvironmentVariable("APMT_SHOT_HINTS") == "1")
         {
