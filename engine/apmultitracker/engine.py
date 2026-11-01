@@ -342,7 +342,8 @@ class SlotContext(CommonContext):
             # Options the room already rolled are taken from its slot data, so the rebuild matches the real game.
             fixed = slot_data_options(game, slot_data)
             if fixed:
-                log.info(f"{slot_name}: using the room's {', '.join(f'{k}={v}' for k, v in fixed.items())}")
+                # Names only: the values can be spoilers (e.g. a game still locked by SlotLock), and the log is easy to open.
+                log.info(f"{slot_name}: using the room's {', '.join(sorted(fixed))} instead of the YAML's")
                 shared = self.engine.patched_yaml_world(self.yaml_folder, slot_name, game, fixed, only_own=False)
             else:
                 shared = self.engine.yaml_world(self.yaml_folder)
