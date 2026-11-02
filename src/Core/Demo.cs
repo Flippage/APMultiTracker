@@ -137,7 +137,10 @@ public static class Demo
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
                 // Current area (games whose client reports where the player is)
-                ["area"] = g.Id == "d2" ? new JsonObject { ["name"] = g.Regions[0], ["locations"] = new JsonArray(1000, 1001, 5000) } : null,
+                ["area"] = g.Id == "d2" ? new JsonObject { ["state"] = "ok", ["name"] = g.Regions[0], ["locations"] = new JsonArray(1000, 1001, 5000) }
+                         : g.Id == "d3" ? new JsonObject { ["state"] = "waiting", ["name"] = "", ["locations"] = new JsonArray(),
+                                                           ["detail"] = $"{g.Game} reports where you are while its own client is connected to the room. Nothing has been reported yet." }
+                         : null,
             });
         }
         store.SetFocus(null);

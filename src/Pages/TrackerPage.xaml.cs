@@ -437,8 +437,11 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         var s = _shown;
         if (s == null) return;
         FTitle.Text = s.Title;
-        FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "")
-                    + (s.HasArea ? "  ·  " + s.AreaText : "");
+        FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "");
+        FArea.Visibility = s.ShowAreaLine ? Visibility.Visible : Visibility.Collapsed;
+        FArea.Text = s.AreaText;
+        FArea.Foreground = s.AreaBrush;
+        FArea.ToolTip = string.IsNullOrEmpty(s.AreaTip) ? null : s.AreaTip;
         Art.SetUrl(FArt, s.ArtUrl);
         FInLogic.Text = s.InLogicText;
         FInLogicLabel.Text = s.IsBK ? "" : " in logic";
@@ -1626,6 +1629,15 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         if (_checks.Count == 0 || !_checks[0].Here) throw new InvalidOperationException("Current area checks aren't at the top of the list.");
         if (slot.Overview.Count > 0 && !slot.Overview[0].Here) throw new InvalidOperationException("Current area checks aren't at the top of the All games column.");
         FInLogicPill.IsChecked = true;
+
+        // A game that can report its area but hasn't: a grey "not reported" line with the reason on hover, nothing marked
+        var quiet = App.Tracker.Slots.FirstOrDefault(s => s.ShowAreaLine && !s.HasArea)
+                    ?? throw new InvalidOperationException("No demo game is waiting for its area.");
+        if (quiet.AreaText != "📍 Area: not reported" || quiet.AreaBrush != Brushes2.Sub || quiet.AreaTip.Length == 0
+            || quiet.Locations.Any(l => l.Here))
+            throw new InvalidOperationException($"A game waiting for its area shows “{quiet.AreaText}”.");
+        if (App.Tracker.Slots.Any(s => !s.ShowAreaLine && s.AreaText.Length > 0))
+            throw new InvalidOperationException("A game without area support shows an area line.");
     }
 
     /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>

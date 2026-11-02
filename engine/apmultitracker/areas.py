@@ -17,21 +17,42 @@ from typing import Any, Callable, Optional
 log = logging.getLogger("APMultiTracker")
 
 
+ISSUES = "https://github.com/Flippage/APMultiTracker/issues"
+
+
 class AreaWatcher:
-    """One game's adapter. `keys` are data storage keys to watch; `on_value` / `on_bounce` return True when the
-    current area changed."""
+    """One game's adapter. `keys` are data storage keys to watch; `on_value` / `on_bounce` return True when what
+    the app should show changed. State: "ok" (name + locations), "waiting" (nothing reported yet), "unrecognised"
+    (reported something this adapter doesn't know) or "unavailable" (the adapter couldn't load)."""
+    # Shown while nothing has been reported, after "<game> reports where you are while its own client is connected."
+    waiting_note = ""
 
     def __init__(self, keys: list[str]):
         self.keys = keys
-        self.name = ""                      # "" = unknown (game not running, or not reported yet)
+        self.game = ""
+        self.state = "waiting"
+        self.name = ""
+        self.detail = ""
         self.locations: frozenset[int] = frozenset()
 
-    def _set(self, name: str, locations) -> bool:
+    def _change(self, state: str, name: str, locations, detail: str) -> bool:
         locations = frozenset(locations)
-        if name == self.name and locations == self.locations:
+        if (state, name, locations, detail) == (self.state, self.name, self.locations, self.detail):
             return False
-        self.name, self.locations = name, locations
+        self.state, self.name, self.locations, self.detail = state, name, locations, detail
         return True
+
+    def _set(self, name: str, locations) -> bool:
+        return self._change("ok", name, locations, "")
+
+    def _waiting(self, note: str = "") -> bool:
+        return self._change("waiting", "", (), note)
+
+    def _unknown(self, value: Any) -> bool:
+        return self._change("unrecognised", "", (), (
+            f"{self.game} reported “{value}”, which the tracker doesn't recognise as a place. Its client or apworld "
+            f"may have changed since this version of APMultiTracker. Please raise an issue at {ISSUES} with the game, "
+            f"its apworld version and this message."))
 
     def on_value(self, key: str, value: Any) -> bool:
         return False
@@ -39,10 +60,21 @@ class AreaWatcher:
     def on_bounce(self, data: dict) -> bool:
         return False
 
-    def payload(self) -> Optional[dict]:
-        if not self.name:
-            return None
-        return {"name": self.name, "locations": sorted(self.locations)}
+    def payload(self) -> dict:
+        detail = self.detail
+        if self.state == "waiting":
+            detail = (f"{self.game} reports where you are while its own client is connected to the room. "
+                      f"Nothing has been reported yet. {self.waiting_note} {detail}").strip()
+        return {"state": self.state, "name": self.name, "locations": sorted(self.locations), "detail": detail}
+
+
+class _Unavailable(AreaWatcher):
+    """A game with an adapter that couldn't load: shown as such, so it doesn't look like the game is just quiet."""
+
+    def __init__(self, game: str, detail: str):
+        super().__init__([])
+        self.game = game
+        self._change("unavailable", "", (), detail)
 
 
 def _package(world_cls) -> str:
@@ -77,6 +109,8 @@ def _common_prefix(names: list[str]) -> str:
 # map each region is on.
 
 class _Emerald(AreaWatcher):
+    waiting_note = "Pokémon Emerald only reports it when you change map, so walk onto another map once its client is connected."
+
     def __init__(self, world_cls, core, team: int, slot: int):
         super().__init__([])
         data = _sub(world_cls, "data").data
@@ -95,7 +129,7 @@ class _Emerald(AreaWatcher):
             return False
         name = self.map_name.get(data.get("mapId"))
         if name is None:
-            return self._set("", ())
+            return self._unknown(f"map {data.get('mapId')}")
         return self._set(self.label.get(name, name), self.by_map.get(name, ()))
 
 
@@ -114,10 +148,12 @@ class _MinishCap(AreaWatcher):
                 self.region[loc.room_area][loc.region] += 1
 
     def on_value(self, key: str, value: Any) -> bool:
-        if not isinstance(value, int) or value == 0:
-            return self._set("", ())
+        if value in (None, 0, ""):
+            return self._waiting()
+        if not isinstance(value, int):
+            return self._unknown(value)
         names = self.region.get(value)
-        return self._set(names.most_common(1)[0][0] if names else "No checks in this room", self.by_room.get(value, ()))
+        return self._set(names.most_common(1)[0][0] if names else "Unnamed room", self.by_room.get(value, ()))
 
 
 # ---------------------------------------------------------------------------------------------- Paper Mario: TTYD
@@ -138,10 +174,14 @@ class _TTYD(AreaWatcher):
         self.label = {rel: _common_prefix(n) for rel, n in names.items()}
 
     def on_value(self, key: str, value: Any) -> bool:
-        if not isinstance(value, str) or not value:
-            return self._set("", ())
+        if value in (None, 0, ""):
+            return self._waiting()
+        if not isinstance(value, str):
+            return self._unknown(value)
         rel = value.split("_", 1)[0].lower()
-        return self._set(self.label.get(rel) or value, self.by_area.get(rel, ()))
+        if rel not in self.by_area:
+            return self._unknown(value)
+        return self._set(self.label.get(rel) or value, self.by_area[rel])
 
 
 # ---------------------------------------------------------------------------------------------- Twilight Princess
@@ -160,8 +200,10 @@ class _TwilightPrincess(AreaWatcher):
                 self.by_node[int(node)].add(present[name])
 
     def on_value(self, key: str, value: Any) -> bool:
-        if not isinstance(value, str) or value in ("", "Menu") or value not in self.node_number:
-            return self._set("", ())
+        if value in (None, "", "Menu", -1):
+            return self._waiting()
+        if not isinstance(value, str) or value not in self.node_number:
+            return self._unknown(value)
         return self._set(value, self.by_node.get(self.node_number[value], ()))
 
 
@@ -178,12 +220,14 @@ class _CrossCode(AreaWatcher):
         self.paths = {lid: path for lid, path in cc.LOCATIONS.items() if lid in present}
 
     def on_value(self, key: str, value: Any) -> bool:
-        if not isinstance(value, str) or not value or value == "newgame":
-            return self._set("", ())
+        if value in (None, "", "newgame", "rookie-harbor.title"):
+            return self._waiting()
+        if not isinstance(value, str):
+            return self._unknown(value)
         parts = value.split(".")
         area = self.cc.REGIONS.get(parts[0])
         if area is None:
-            return self._set("", ())
+            return self._unknown(value)
         in_area = {lid: path for lid, path in self.paths.items() if path.split("/", 1)[0] == area}
         floor = self.cc.FLOORS.get(".".join(parts[:2])) if len(parts) > 1 else None
         if floor:
@@ -285,12 +329,16 @@ class _UTMap(AreaWatcher):
         return read_module
 
     def on_value(self, key: str, value: Any) -> bool:
+        if value in (None, ""):
+            return self._waiting()
         try:
-            i = int(self.index(value if value is not None else ""))
+            i = int(self.index(value))
         except Exception:
-            return self._set("", ())
-        if i < 0 or i >= len(self.maps) or not self.maps[i] or self.maps[i] in self.overview:
-            return self._set("", ())
+            return self._unknown(value)
+        if i < 0 or i >= len(self.maps) or not self.maps[i]:
+            return self._unknown(value)
+        if self.maps[i] in self.overview:
+            return self._waiting("You're on its overview map.")
         name = self.maps[i]
         label = name.replace("_", " ").replace("-", " ")
         return self._set(label.title() if label.islower() else label, self.by_map.get(name, ()))
@@ -309,17 +357,31 @@ def make(game: str, world_cls, core, team: int, slot: int) -> Optional[AreaWatch
     """Worker thread. The game's area watcher, or None if it has none (or its apworld isn't laid out as expected)."""
     if core is None or core.multiworld is None:
         return None
+    failure = ""
     factory = ADAPTERS.get(game)
     if factory is not None:
         try:
-            return factory(world_cls, core, team, slot)
-        except Exception:
+            return _named(factory(world_cls, core, team, slot), game)
+        except Exception as e:
             log.warning(f"Current area isn't available for {game} (its apworld isn't laid out as expected)", exc_info=True)
+            failure = (f"The tracker couldn't read {game}'s area data from its apworld ({type(e).__name__}: {e}). The "
+                       f"apworld may have changed since this version of APMultiTracker. Please raise an issue at {ISSUES} "
+                       f"with the game, its apworld version and this message.")
     # Otherwise (or if that failed): Universal Tracker's map auto-tabbing, if the apworld has it
     tw = getattr(world_cls, "tracker_world", None)
     if isinstance(tw, dict) and callable(tw.get("map_page_index")):
         try:
-            return _UTMap(world_cls, core, team, slot)
-        except Exception:
+            return _named(_UTMap(world_cls, core, team, slot), game)
+        except LookupError as e:   # e.g. no PopTracker pack picked for Universal Tracker yet
+            failure = failure or (f"{game}'s area comes from its Universal Tracker map, which isn't set up: {e}. Open "
+                                  f"{game} in Universal Tracker once and pick its PopTracker pack to use it here too.")
+        except Exception as e:
             log.warning(f"Current area isn't available for {game} (couldn't read its Universal Tracker map pack)", exc_info=True)
-    return None
+            failure = failure or (f"The tracker couldn't read {game}'s Universal Tracker map ({type(e).__name__}: {e}). "
+                                  f"Please raise an issue at {ISSUES} with the game, its apworld version and this message.")
+    return _Unavailable(game, failure) if failure else None
+
+
+def _named(w: AreaWatcher, game: str) -> AreaWatcher:
+    w.game = game
+    return w

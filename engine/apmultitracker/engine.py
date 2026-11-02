@@ -688,7 +688,7 @@ class SlotContext(CommonContext):
             "manual_items": list(getattr(core, "manual_items", [])),
             "errors": errors,
             "warning": self.warning,
-            "area": inputs["area"],   # where the player is, if the game reports it: {name, locations}
+            "area": inputs["area"],   # games with an area adapter: {state, name, locations, detail}
         }
 
     # ---- explain / logical path

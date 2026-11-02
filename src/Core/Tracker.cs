@@ -173,10 +173,25 @@ public sealed class SlotView : INotifyPropertyChanged
     public bool ShowCount => !Goal && !Locked && !IsSlotLock;
     /// <summary>Where the player is right now ("" when the game doesn't report it or isn't running).</summary>
     public string AreaName { get; private set; } = "";
-    public bool HasArea => AreaName.Length > 0;
+    /// <summary>"" = this game has no area support; else "ok", "waiting", "unrecognised" or "unavailable".</summary>
+    public string AreaState { get; private set; } = "";
+    /// <summary>Why the area isn't shown (for the tooltip), when it isn't.</summary>
+    public string AreaDetail { get; private set; } = "";
+    public bool HasArea => AreaState == "ok" && AreaName.Length > 0;
+    /// <summary>Show the area line: where you are, or (in grey) why it isn't known, for games that can report it.</summary>
+    public bool ShowAreaLine => AreaState.Length > 0;
     /// <summary>Checks left in the current area.</summary>
     public int HereCount { get; private set; }
-    public string AreaText => HasArea ? $"📍 {AreaName}" + (HereCount > 0 ? $" · {HereCount} {(HereCount == 1 ? "check" : "checks")} here" : " · no checks here") : "";
+    public string AreaText => AreaState switch
+    {
+        "" => "",
+        _ when HasArea => $"📍 {AreaName}" + (HereCount > 0 ? $" · {HereCount} {(HereCount == 1 ? "check" : "checks")} here" : " · no checks here"),
+        "unrecognised" => "📍 Area: not recognised",
+        "unavailable" => "📍 Area: unavailable",
+        _ => "📍 Area: not reported",
+    };
+    public string AreaTip => HasArea ? AreaText : AreaDetail;
+    public Brush AreaBrush => HasArea ? Brushes2.Accent : Brushes2.Sub;
 
     /// <summary>Locked by a SlotLock player: nothing in this game counts as in logic until its unlock item arrives.</summary>
     public bool Locked { get; private set; }
@@ -352,6 +367,8 @@ public sealed class SlotView : INotifyPropertyChanged
         // Where the player is right now (games whose client reports it), and which checks are there
         var area = m["area"] as JsonObject;
         AreaName = area?["name"]?.GetValue<string>() ?? "";
+        AreaState = area == null ? "" : area["state"]?.GetValue<string>() ?? (AreaName.Length > 0 ? "ok" : "waiting");
+        AreaDetail = area?["detail"]?.GetValue<string>() ?? "";
         var here = (area?["locations"] as JsonArray)?.Select(n => Json.Long(n)).ToHashSet() ?? new HashSet<long>();
 
         var locs = new List<CheckItem>();
@@ -391,6 +408,7 @@ public sealed class SlotView : INotifyPropertyChanged
                        .Select(l => l.IsInLogic || l.IsGlitched ? l with { Status = "out_of_logic" } : l).ToList();
             GoMode = "no";
         }
+        if (!HasArea) here.Clear();
         if (here.Count > 0) locs = locs.Select(l => here.Contains(l.Id) ? l with { HereArea = AreaName } : l).ToList();
         HereCount = locs.Count(l => l.Here && !l.IsHidden);
         Entrances = locs.Count(l => l.IsEntrance);
