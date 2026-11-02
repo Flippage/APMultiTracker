@@ -14,6 +14,11 @@ namespace APMultiTracker;
 /// <summary>One location that hasn't been checked yet.</summary>
 public sealed record CheckItem(long Id, string Name, string Region, string Status, bool Excluded, string? Hint, string? Key = null)
 {
+    /// <summary>The area the player is in right now, when this check is there (games whose client reports it).</summary>
+    public string? HereArea { get; init; }
+    public bool Here => HereArea != null;
+    /// <summary>Region heading, with the player's current area first under its own heading.</summary>
+    public string GroupKey => HereArea != null ? "📍 Current area: " + HereArea : Region;
     /// <summary>The location's real name (Name may include an alias), for explain / logical path.</summary>
     public string LookupName => string.IsNullOrEmpty(Key) ? Name : Key;
     public bool IsHidden => Status == "ignored";
@@ -134,7 +139,7 @@ public sealed class SlotView : INotifyPropertyChanged
         _game = slot.Game;
         OverviewView = new System.Windows.Data.ListCollectionView(Overview);
         if (App.Config.OverviewGroupByRegion)
-            OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.Region)));
+            OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.GroupKey)));
     }
 
     private string _game;
@@ -166,6 +171,12 @@ public sealed class SlotView : INotifyPropertyChanged
     /// <summary>The slot has reported its goal as complete (client status GOAL).</summary>
     public bool Goal { get; private set; }
     public bool ShowCount => !Goal && !Locked && !IsSlotLock;
+    /// <summary>Where the player is right now ("" when the game doesn't report it or isn't running).</summary>
+    public string AreaName { get; private set; } = "";
+    public bool HasArea => AreaName.Length > 0;
+    /// <summary>Checks left in the current area.</summary>
+    public int HereCount { get; private set; }
+    public string AreaText => HasArea ? $"📍 {AreaName}" + (HereCount > 0 ? $" · {HereCount} {(HereCount == 1 ? "check" : "checks")} here" : " · no checks here") : "";
 
     /// <summary>Locked by a SlotLock player: nothing in this game counts as in logic until its unlock item arrives.</summary>
     public bool Locked { get; private set; }
@@ -216,7 +227,7 @@ public sealed class SlotView : INotifyPropertyChanged
         {
             OverviewView.GroupDescriptions.Clear();
             if (App.Config.OverviewGroupByRegion)
-                OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.Region)));
+                OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.GroupKey)));
         }
         ListSync.Sync(Overview, SortOverview(Locations));
     }
@@ -226,8 +237,8 @@ public sealed class SlotView : INotifyPropertyChanged
         var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" || (l.IsGlitched && App.Config.OverviewShowGlitched))
                                     && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
-                ? shown.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
-                : shown.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
+                ? shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
+                : shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
             .ToList();
     }
 
@@ -338,6 +349,10 @@ public sealed class SlotView : INotifyPropertyChanged
                       ?? new List<string>();
         AutoRelease = m["auto_release"]?.GetValue<bool>() ?? false;
         Warning = m["warning"]?.GetValue<string>() ?? "";
+        // Where the player is right now (games whose client reports it), and which checks are there
+        var area = m["area"] as JsonObject;
+        AreaName = area?["name"]?.GetValue<string>() ?? "";
+        var here = (area?["locations"] as JsonArray)?.Select(n => Json.Long(n)).ToHashSet() ?? new HashSet<long>();
 
         var locs = new List<CheckItem>();
         if (m["locations"] is JsonArray arr)
@@ -376,6 +391,8 @@ public sealed class SlotView : INotifyPropertyChanged
                        .Select(l => l.IsInLogic || l.IsGlitched ? l with { Status = "out_of_logic" } : l).ToList();
             GoMode = "no";
         }
+        if (here.Count > 0) locs = locs.Select(l => here.Contains(l.Id) ? l with { HereArea = AreaName } : l).ToList();
+        HereCount = locs.Count(l => l.Here && !l.IsHidden);
         Entrances = locs.Count(l => l.IsEntrance);
         // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
         InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);

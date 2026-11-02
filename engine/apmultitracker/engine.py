@@ -170,6 +170,7 @@ class SlotContext(CommonContext):
         self.region_by_name: dict[str, str] = {}
         self.deferred_keys: list[str] = []
         self.deferred_callback: Optional[Callable] = None
+        self.area = None   # areas.AreaWatcher: where the player is, for games whose client reports it
         self.persist_id = ""
         self.room_seed = ""
         self.warning = ""
@@ -254,11 +255,18 @@ class SlotContext(CommonContext):
                 if self._hint_key in keys or self._status_key in keys:
                     self.watcher_event.set()
                 self._deferred_changed([k for k in self.deferred_keys if k in keys])
+                for k in keys:
+                    self._area_value(k, keys[k])
             elif cmd == "SetReply":
                 key = args.get("key", "")
                 if key in (self._hint_key, self._status_key):
                     self.watcher_event.set()
                 self._deferred_changed([key] if key in self.deferred_keys else [])
+                self._area_value(key, args.get("value"))
+            elif cmd == "Bounced":
+                area = self.area
+                if area is not None and area.on_bounce(args.get("data") or {}):
+                    self.watcher_event.set()
         except Exception as e:
             log.exception(e)
             self.set_status("error", f"Tracker error: {e}")
@@ -321,6 +329,8 @@ class SlotContext(CommonContext):
             return
         if self.deferred_keys:
             self.set_notify(*self.deferred_keys)
+        if self.area is not None and self.area.keys:
+            self.set_notify(*self.area.keys)   # also fetches the current value
         self.logic_ready = True
         self.set_status("tracking", "")
         self.watcher_event.set()
@@ -415,6 +425,9 @@ class SlotContext(CommonContext):
         if hasattr(core, "manual_items"):
             core.manual_items = [n for n in saved.get("manual", []) if n in names]
 
+        from . import areas
+        self.area = areas.make(game, world_cls, core, self.team, self.slot)
+
         keys = getattr(world, "found_entrances_datastorage_key", None)
         callback = getattr(world, "reconnect_found_entrances", None)
         if keys and callable(callback) and core.enforce_deferred_connections != DeferredEntranceMode.disabled:
@@ -422,6 +435,11 @@ class SlotContext(CommonContext):
             self.deferred_keys = [k.format(player=self.slot, team=self.team) for k in keys]
             self.deferred_callback = callback
         self.core = core
+
+    def _area_value(self, key: str, value) -> None:
+        area = self.area
+        if area is not None and key in area.keys and area.on_value(key, value):
+            self.watcher_event.set()
 
     def _deferred_changed(self, keys: list[str]) -> None:
         if not keys or not self.deferred_callback or not self.logic_ready:
@@ -478,6 +496,7 @@ class SlotContext(CommonContext):
             "hint_list": self._hint_list(),
             # The room releases a slot's remaining items when it goals ("auto" / "auto_enabled" release mode)
             "auto_release": "auto" in str(self.permissions.get("release", "")),
+            "area": self.area.payload() if self.area is not None else None,
         }
         return inputs
 
@@ -669,6 +688,7 @@ class SlotContext(CommonContext):
             "manual_items": list(getattr(core, "manual_items", [])),
             "errors": errors,
             "warning": self.warning,
+            "area": inputs["area"],   # where the player is, if the game reports it: {name, locations}
         }
 
     # ---- explain / logical path

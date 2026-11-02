@@ -136,6 +136,8 @@ public static class Demo
                 ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
+                // Current area (games whose client reports where the player is)
+                ["area"] = g.Id == "d2" ? new JsonObject { ["name"] = g.Regions[0], ["locations"] = new JsonArray(1000, 1001, 5000) } : null,
             });
         }
         store.SetFocus(null);

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.12.0
+
+- **Current area** (engine v0.4.13): for games whose client reports where you are, the checks in the area you're
+  standing in move to the top of the game's list under **📍 Current area: …** (and to the top of its All games
+  column), each tagged **HERE**. The game's header and column show where you are and how many checks are left there.
+  Works while the game's own client is connected, for:
+  - **Pokémon Emerald**: the exact map (e.g. Route 104, or a single house). Shows up once you next change map.
+  - **The Minish Cap**: the exact room.
+  - **Paper Mario: The Thousand-Year Door**: the area (e.g. Rogueport).
+  - **Twilight Princess**: the zone or dungeon (e.g. Faron, Forest Temple).
+  - **CrossCode**: the area, and the floor in dungeons (e.g. Temple Mine U1). Area data from lurch9229's CrossCode
+    PopTracker pack (MIT licence), with thanks.
+
+  Other games don't report where the player is (or not in a way the tracker can use yet), so they're unchanged.
+
 ## v0.11.4
 
 - **Put your games in your own order**: drag a game's card at the top, or its column in **All games** (press on the

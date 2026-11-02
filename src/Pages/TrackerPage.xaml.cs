@@ -437,7 +437,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         var s = _shown;
         if (s == null) return;
         FTitle.Text = s.Title;
-        FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "");
+        FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "")
+                    + (s.HasArea ? "  ·  " + s.AreaText : "");
         Art.SetUrl(FArt, s.ArtUrl);
         FInLogic.Text = s.InLogicText;
         FInLogicLabel.Text = s.IsBK ? "" : " in logic";
@@ -521,8 +522,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                                      || l.Region.Contains(q, StringComparison.OrdinalIgnoreCase)
                                      || (l.Hint?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
         var sorted = App.Config.GroupByRegion
-            ? items.OrderBy(l => l.Region, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
-            : items.OrderBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance);
+            ? items.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
+            : items.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance);
         ListSync.Sync(_checks, sorted.ToList());
         // Group containers can be reused for other regions as the list changes: re-apply collapsed state.
         Dispatcher.BeginInvoke(new Action(() => { foreach (var g in FindGroupItems(CheckListBox)) ApplyGroupState(g); }),
@@ -839,7 +840,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         using (_view.DeferRefresh())
         {
             _view.GroupDescriptions.Clear();
-            if (App.Config.GroupByRegion) _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CheckItem.Region)));
+            if (App.Config.GroupByRegion) _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CheckItem.GroupKey)));
         }
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowRegionLine)));
         bool explain = ExplainToggle.IsChecked == true;
@@ -1522,6 +1523,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         SelfTestDropdown();
         SelfTestOverviewGlitched();
         SelfTestSlotLock();
+        SelfTestCurrentArea();
         App.Tracker.SetFocus(null);
         UpdateLayout();
         SelfTestColumns();
@@ -1607,6 +1609,23 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException("Unlocking a SlotLock-locked game didn't bring its checks back.");
         if (App.Tracker.Live.First(l => l.World.Id == room).Feed.Count != feedBefore + 1)
             throw new InvalidOperationException("Unlocking a game didn't say so in the feed.");
+    }
+
+    /// <summary>Self-test: a game that reports where the player is lists that area's checks first, under its own heading.</summary>
+    private void SelfTestCurrentArea()
+    {
+        var slot = App.Tracker.Slots.FirstOrDefault(s => s.HasArea)
+                   ?? throw new InvalidOperationException("No demo game reports a current area.");
+        var here = slot.Locations.Where(l => l.Here).ToList();
+        if (here.Count != 3 || slot.HereCount != 3 || !slot.AreaText.Contains(slot.AreaName))
+            throw new InvalidOperationException($"Current area marks {here.Count} checks (expected 3).");
+        App.Tracker.SetFocus(slot);
+        FInLogicPill.IsChecked = false;
+        FAllPill.IsChecked = true;
+        UpdateLayout();
+        if (_checks.Count == 0 || !_checks[0].Here) throw new InvalidOperationException("Current area checks aren't at the top of the list.");
+        if (slot.Overview.Count > 0 && !slot.Overview[0].Here) throw new InvalidOperationException("Current area checks aren't at the top of the All games column.");
+        FInLogicPill.IsChecked = true;
     }
 
     /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>

@@ -44,6 +44,7 @@ in one place, with a faster, cleaner interface.
 | 🔔 **GO MODE alerts** | A Windows notification (or an in-app banner) and a jingle when one of your games enters go mode. Volume, your own sound, or off, in Settings. |
 | 💡 **Hints** | Hinted checks are marked with the item and who it's for. The **Hints** panel shows your hint points and the cost, lets you buy a hint for any of your items (or right-click a check to hint that location), and lists every hint for the game. |
 | 🙈 **Hide checks** | Hide checks you've dealt with (saved per seed, like UT's `/ignore`), or hide / unhide them all at once (`/ignore_all`, `/reset_ignored`). |
+| 📍 **Current area** | For games whose client reports where you are (Pokémon Emerald, The Minish Cap, Paper Mario: The Thousand-Year Door, Twilight Princess, CrossCode), the checks in the area you're standing in go to the top of the list under **📍 Current area**, and the game's column shows where you are. Needs the game's own client to be connected. |
 | 🔒 **SlotLock** | In a room with a SlotLock player, games it has locked show **LOCKED** with nothing in logic, and unlock by themselves when their Unlock item arrives. |
 | 🚫 **Excluded checks** | Checks excluded in a YAML are dimmed and tagged (or hidden, in Settings) and never count toward a game's number. |
 | 🖼️ **Box art** | Pulled from Twitch by game name with no login. Click the art to pick a different one (optional Twitch connect). |
@@ -184,3 +185,10 @@ Windows user (DPAPI). The engine only listens on 127.0.0.1 and requires a per-se
 Logic by [Universal Tracker](https://github.com/FarisTheAncient/Archipelago) (FarisTheAncient and contributors).
 Built on [Archipelago](https://archipelago.gg). Interface style shared with
 [AutoSwitcher](https://github.com/Flippage/TwitchAutoSwitcher).
+
+Current area data:
+- **CrossCode** areas, dungeon floors and which checks are in each: from the
+  [CrossCode PopTracker pack](https://github.com/lurch9229/CrossCode-Poptracker-AP) by lurch9229 (MIT licence; the
+  licence text is in `engine/apmultitracker/area_crosscode.py`).
+- **Pokémon Emerald, The Minish Cap, Paper Mario: The Thousand-Year Door, Twilight Princess**: from each game's own
+  apworld (its map, room, area or zone data), read at runtime from your Archipelago install.
