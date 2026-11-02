@@ -143,30 +143,22 @@ def slot_data_options(game: str, slot_data: dict) -> dict:
         return {}
 
 
-# Pokédex checks whose logic a rebuild can't know: the logic follows the wild encounter tables, which are randomized
-# when the room is generated and not shared with trackers (no slot data / re_gen_passthrough for them), so a tracker's
-# rebuild rolls its own. Game -> (dexsanity option, wild randomization option). Pokémon Crystal is left out: its
-# apworld passes its real data to Universal Tracker.
+# Pokédex checks (dexsanity) can't be judged by the logic: a Pokédex entry also appears when you only *see* a
+# Pokémon (e.g. a trainer's), and where wild Pokémon live may be randomized and not shared with trackers. With
+# dexsanity on (any game with a `dexsanity` option, e.g. Pokémon Emerald, Red and Blue, Crystal), every
+# "Pokedex - " check is shown as uncertain: listed, but never counted as in logic.
 UNCERTAIN_PREFIX = "Pokedex - "
-UNCERTAIN_GAMES = {
-    "Pokemon Emerald": ("dexsanity", "wild_pokemon"),
-    "Pokemon Red and Blue": ("dexsanity", "randomize_wild_pokemon"),
-}
 
 
 def uncertain_checks(game: str, world) -> str:
-    """Why this game's Pokédex checks can't be judged, or "" when their logic is fine (dexsanity off, or wild
-    Pokémon not randomized)."""
-    names = UNCERTAIN_GAMES.get(game)
-    options = getattr(world, "options", None)
-    if not names or options is None:
+    """Why this game's Pokédex checks can't be judged, or "" when it has none (dexsanity off)."""
+    dexsanity = getattr(getattr(world, "options", None), "dexsanity", None)
+    if not getattr(dexsanity, "value", 0):
         return ""
-    dexsanity, wilds = (getattr(options, n, None) for n in names)
-    if not getattr(dexsanity, "value", 0) or not getattr(wilds, "value", 0):
-        return ""
-    return (f"Logic unknown: {game}'s wild Pokémon are randomized, and the room doesn't share where each one lives, "
-            f"so the tracker can't tell whether you can catch this one yet. Check your Pokédex in game for where "
-            f"you've seen it. These checks don't count toward the number in logic.")
+    return ("Not caught yet. The tracker can't tell whether you can catch this Pokémon right now (it may only have "
+            "been seen, e.g. in a trainer battle, and where wild Pokémon live can be randomized), so finding it is "
+            "up to you: your Pokédex in game shows where you've seen it. Pokédex checks don't count toward the "
+            "number in logic.")
 
 
 # ---------------------------------------------------------------------------------------------- slots
