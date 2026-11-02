@@ -2,42 +2,43 @@
 
 ## v0.12.0
 
-- **Current area** (engine v0.4.14): for games whose client reports where you are, the checks in the area you're
-  standing in move to the top of the game's list under **📍 Current area: …** (and to the top of its All games
-  column), under one **📍 Current area** heading. The game's header and column show where you are and what's
-  left there: **📍 Route 115 · 10 checks here · 3 in logic · 1 glitched** (in logic in green, glitched in yellow).
-  Works while the game's own client is connected, for:
+Engine v0.4.17.
+
+- **Current area**: for games whose client reports where you are, the checks in the area you're standing in move to
+  the top of the game's list (and its All games column) under one **📍 Current area: …** heading. The game's header
+  and column show where you are and what's left there: **📍 Route 115 · 10 checks here · 3 in logic · 1 glitched**
+  (in logic in green, glitched in yellow). Works while the game's own client is connected, for:
   - **Pokémon Emerald**: the exact map (e.g. Route 104, or a single house). Shows up once you next change map.
   - **The Minish Cap**: the exact room.
   - **Paper Mario: The Thousand-Year Door**: the area (e.g. Rogueport).
   - **Twilight Princess**: the zone or dungeon (e.g. Faron, Forest Temple).
   - **CrossCode**: the area, and the floor in dungeons (e.g. Temple Mine U1). Area data from lurch9229's CrossCode
     PopTracker pack (MIT licence), with thanks.
-
   - **Any game whose apworld has a Universal Tracker map with auto-tabbing** (e.g. Donkey Kong 64, once you've picked
     its PopTracker pack for Universal Tracker): the map Universal Tracker would switch to, with the checks on it.
 
   For these games, when the area isn't known a small grey **📍 Area: not reported** shows instead (or **not
   recognised** / **unavailable**). Hover it to see why: the game's client isn't connected yet, it reported a place the
-  tracker doesn't know, or its apworld has changed (with a link to raise an issue).
-
-  Other games don't report where the player is (or not in a way the tracker can use yet), so they're unchanged.
-- **Pokédex checks** (dexsanity, e.g. Pokémon Emerald, Red and Blue, Crystal): the tracker can't judge them (an entry
-  also shows up when you've only seen a Pokémon, say in a trainer battle, and wild Pokémon can be randomized), so with
-  dexsanity on they all show a grey **?** (hover for why), even ones the logic thinks are reachable. They're still listed in the game's list and its All games
-  column, so you can see what you haven't caught yet, but they no longer count toward the number in logic.
-- **Random YAML options use the room's values** (engine v0.4.15): for games without Universal Tracker support, any
-  option the room shares (most games share their settings) is taken from the room instead of being rolled again
-  from the YAML, so an option left to chance in a YAML matches the real game. Pokémon Emerald's **free fly town**
-  (picked at random while generating) comes from the room too, so the logic no longer flies you somewhere else.
-- The engine is reinstalled whenever the app's copy differs from the one in Archipelago, not only when its version
-  number goes up.
+  tracker doesn't know, or its apworld has changed (with a link to raise an issue). Other games don't report where
+  the player is, so they're unchanged.
 - **Pokémon Emerald: Wild encounters** (with dexsanity on, like the Emerald PopTracker pack's encounter locations): a
   **🌿 Wild encounters** group lists every encounter on each map by method, with its chance: "Route 104 · Old Rod
   encounter 1, 70%" (grass & caves, surfing, Old / Good / Super Rod; equal chances with normalized encounter rates).
   Each is coloured by whether you can get there with what it takes, and counts like a check: in the number in logic,
   the All games column and your current area, where the ones on your map go to the top. Which Pokémon it is is
   randomized and not shared with trackers, so hide it (eye button) once you've caught it.
+- **Pokédex checks** (dexsanity, e.g. Pokémon Emerald, Red and Blue, Crystal): the tracker can't judge them (an entry
+  also shows up when you've only seen a Pokémon, say in a trainer battle, and wild Pokémon can be randomized), so with
+  dexsanity on they all show a grey **?** (hover for why). They're still listed in the game's list and its All games
+  column, so you can see what you haven't caught yet, but they don't count toward the number in logic.
+- **Random YAML options use the room's values**: for games without Universal Tracker support, any option the room
+  shares (most games share their settings) is taken from the room instead of being rolled again from the YAML, so an
+  option left to chance in a YAML matches the real game. This applies to every tracked game sharing a YAML folder, so
+  one player's random roll can't break the others' build either. Pokémon Emerald's **free fly town** (picked at random
+  while generating) comes from the room too, so the logic no longer flies you somewhere else.
+- The engine is reinstalled whenever the app's copy differs from the one in Archipelago, not only when its version
+  number goes up.
+- Test builds from GitHub no longer update themselves to the latest release as soon as they start.
 
 ## v0.11.4
 
