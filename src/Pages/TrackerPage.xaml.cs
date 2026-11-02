@@ -441,7 +441,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FArea.Visibility = s.ShowAreaLine ? Visibility.Visible : Visibility.Collapsed;
         FArea.Text = s.AreaText;
         FArea.Foreground = s.AreaBrush;
-        FArea.ToolTip = string.IsNullOrEmpty(s.AreaTip) ? null : s.AreaTip;
+        // A wrapping tooltip: the reason can be a few sentences long
+        FArea.ToolTip = string.IsNullOrEmpty(s.AreaTip) ? null : new TextBlock { Text = s.AreaTip, TextWrapping = TextWrapping.Wrap, MaxWidth = 440 };
         Art.SetUrl(FArt, s.ArtUrl);
         FInLogic.Text = s.InLogicText;
         FInLogicLabel.Text = s.IsBK ? "" : " in logic";

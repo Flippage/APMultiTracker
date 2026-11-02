@@ -461,8 +461,13 @@
                                                 <Run Text="{Binding SlotName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CheckedText, Mode=OneWay}"/>
                                             </TextBlock>
                                             <TextBlock Text="{Binding AreaText}" FontSize="11.5" Foreground="{Binding AreaBrush}" TextTrimming="CharacterEllipsis"
-                                                       Visibility="{Binding ShowAreaLine, Converter={StaticResource Vis}}" ToolTip="{Binding AreaTip}"
-                                                       ToolTipService.ShowDuration="60000"/>
+                                                       Visibility="{Binding ShowAreaLine, Converter={StaticResource Vis}}" ToolTipService.ShowDuration="60000">
+                                                <TextBlock.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock Text="{Binding AreaTip}" TextWrapping="Wrap" MaxWidth="440"/>
+                                                    </ToolTip>
+                                                </TextBlock.ToolTip>
+                                            </TextBlock>
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>

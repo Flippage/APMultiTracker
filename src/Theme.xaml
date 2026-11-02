@@ -801,13 +801,6 @@
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
-        <!-- Long tooltips (e.g. why a game's area isn't known) wrap instead of running off the screen -->
-        <Setter Property="MaxWidth" Value="460"/>
-        <Style.Resources>
-            <Style TargetType="TextBlock">
-                <Setter Property="TextWrapping" Value="Wrap"/>
-            </Style>
-        </Style.Resources>
     </Style>
 
 </ResourceDictionary>

@@ -349,18 +349,23 @@ class SlotContext(CommonContext):
         core.set_slot_params(game, self.slot, slot_name, self.team)
         own_yaml_note = own_error = ""
         if not getattr(world_cls, "ut_can_gen_without_yaml", False):
-            # Options the room already rolled are taken from its slot data, so the rebuild matches the real game.
+            # Options the room already rolled are taken from its slot data (this slot's, and every other tracked
+            # slot's in the room), so the rebuild matches the real game and one player's random roll can't break it.
+            patches = self.engine.room_patches(self)
             fixed = slot_data_options(game, slot_data)
             if fixed:
+                patches[slot_name.casefold()] = (game, fixed)
+            for name, (g, opts) in patches.items():
                 # Names only: the values can be spoilers (e.g. a game still locked by SlotLock), and the log is easy to open.
-                log.info(f"{slot_name}: using the room's {', '.join(sorted(fixed))} instead of the YAML's")
-                shared = self.engine.patched_yaml_world(self.yaml_folder, slot_name, game, fixed, only_own=False)
+                log.info(f"{slot_name}: using the room's {', '.join(sorted(opts))} for {name} ({g}) instead of the YAML's")
+            if patches:
+                shared = self.engine.patched_yaml_world(self.yaml_folder, slot_name, patches, only_own=False)
             else:
                 shared = self.engine.yaml_world(self.yaml_folder)
             if shared.launch_multiworld is None:
                 # Someone else's YAML can break the whole folder (a newer Archipelago, an option this rebuild can't
                 # apply...). Build this game from just its own player's YAML instead.
-                own = self.engine.patched_yaml_world(self.yaml_folder, slot_name, game, fixed, only_own=True)
+                own = self.engine.patched_yaml_world(self.yaml_folder, slot_name, patches, only_own=True)
                 if own.launch_multiworld is not None:
                     log.info(f"{slot_name}: the YAML folder couldn't be loaded as a whole; using just {slot_name}'s YAML")
                     culprit, reason = describe_gen_error(shared.gen_error)
@@ -1012,6 +1017,7 @@ class Engine:
         self.clients: set = set()
         self.last: dict[str, dict] = {}
         self.yaml_worlds: dict[str, Any] = {}
+        self.rooms_waited: set[str] = set()   # rooms whose tracked slots room_patches already waited for
         self.own_yaml_worlds: dict[tuple, Any] = {}   # (folder, slot name) -> core built from that player's YAML
         self.lock_watchers: dict[tuple, LockWatcher] = {}   # (room, SlotLock slot name) -> its watcher
         self.locks: dict[tuple, dict] = {}                  # (room, SlotLock slot name) -> last "locks" message
@@ -1053,10 +1059,11 @@ class Engine:
             self.yaml_worlds[key] = core
         return self.yaml_worlds[key]
 
-    def patched_yaml_world(self, folder: str, slot_name: str, game: str, fixed: dict, only_own: bool):
+    def patched_yaml_world(self, folder: str, slot_name: str, patches: dict, only_own: bool):
         """Worker thread: generate from a private copy of the YAML folder (the user's folder is never changed).
-        only_own: just the YAML(s) whose name is this slot's (used when the folder as a whole can't be generated);
-        otherwise every file, as the folder would be. `fixed` sets options in this slot's own YAML for its game."""
+        only_own: just the YAML(s) whose name is slot_name (used when the folder as a whole can't be generated);
+        otherwise every file, as the folder would be. `patches` maps a player name (casefolded) to (game, options):
+        options set in that player's YAML for that game, e.g. values the room already rolled."""
         import shutil
         import tempfile
         import yaml as pyyaml
@@ -1065,18 +1072,22 @@ class Engine:
         if not base:
             from worlds.tracker import TrackerWorld
             base = str(object.__getattribute__(TrackerWorld.settings, "player_files_path").resolve())
-        key = (os.path.normcase(os.path.abspath(base)), slot_name.casefold(), only_own,
-               tuple(sorted((k, repr(v)) for k, v in fixed.items())))
+        if only_own:
+            patches = {k: v for k, v in patches.items() if k == slot_name.casefold()}
+        key = (os.path.normcase(os.path.abspath(base)), slot_name.casefold() if only_own else "", only_own,
+               tuple(sorted((name, game, tuple(sorted((k, repr(v)) for k, v in fixed.items())))
+                            for name, (game, fixed) in patches.items())))
         if key in self.own_yaml_worlds:
             return self.own_yaml_worlds[key]
         TrackerCore = _ut()[0]
         core = TrackerCore(log, False, False)
 
-        def is_own(doc) -> bool:
-            return isinstance(doc, dict) and str(doc.get("name", "")).strip().casefold() == slot_name.casefold()
+        def name_of(doc) -> str:
+            return str(doc.get("name", "")).strip().casefold() if isinstance(doc, dict) else ""
 
-        def patch(doc: dict) -> dict:
-            section = doc.get(game)
+        def patch(doc):
+            game, fixed = patches.get(name_of(doc), ("", {}))
+            section = doc.get(game) if game else None
             if fixed and isinstance(section, dict):
                 doc[game] = {**section, **fixed}
             return doc
@@ -1093,16 +1104,15 @@ class Engine:
                         docs = list(read_weights_yamls(entry.path))
                     except Exception:
                         docs = None   # unreadable: copied as it is (only_own: someone else's problem)
-                own = [d for d in docs or [] if is_own(d)]
-                found += len(own)
                 if only_own:
+                    own = [d for d in docs or [] if name_of(d) == slot_name.casefold()]
                     if own:
+                        found += len(own)
                         with open(os.path.join(private, f"player{found}.yaml"), "w", encoding="utf-8") as f:
                             pyyaml.safe_dump_all([patch(d) for d in own], f, allow_unicode=True, sort_keys=False)
-                elif own and fixed:
+                elif docs and any(name_of(d) in patches for d in docs):
                     with open(os.path.join(private, entry.name), "w", encoding="utf-8") as f:
-                        pyyaml.safe_dump_all([patch(d) if is_own(d) else d for d in docs], f,
-                                             allow_unicode=True, sort_keys=False)
+                        pyyaml.safe_dump_all([patch(d) for d in docs], f, allow_unicode=True, sort_keys=False)
                 else:
                     shutil.copy2(entry.path, os.path.join(private, entry.name))
         if only_own and not found:
@@ -1112,10 +1122,32 @@ class Engine:
         else:
             core.player_folder_override = private
             log.info(f"Generating from {slot_name}'s YAML only" if only_own else
-                     f"Generating from YAMLs in {base} with {slot_name}'s options from the room")
+                     f"Generating from YAMLs in {base} with the room's values for {len(patches)} player(s)")
             core.run_generator(None, None)
         self.own_yaml_worlds[key] = core
         return core
+
+    def room_patches(self, ctx: "SlotContext") -> dict:
+        """Worker thread: room-rolled options of every tracked slot in ctx's room that shares its YAML folder, as
+        patched_yaml_world's patches. Waits briefly for the room's other tracked slots to connect first, since
+        their values only arrive with their own connection."""
+        def peers():
+            return [c for c in list(self.slots.values()) if c.room == ctx.room and c.yaml_folder == ctx.yaml_folder]
+        if ctx.room not in self.rooms_waited:   # once per room: a slot that can't connect mustn't slow every rebuild
+            self.rooms_waited.add(ctx.room)
+            deadline = time.monotonic() + 8
+            while time.monotonic() < deadline and any(
+                    c.slot is None and c.status not in ("error", "stopped") for c in peers()):
+                time.sleep(0.2)
+        patches = {}
+        for c in peers():
+            if c.slot is None or c.slot not in c.slot_info or not c.slot_data:
+                continue
+            game = c.slot_info[c.slot].game
+            fixed = slot_data_options(game, c.slot_data)
+            if fixed:
+                patches[c.slot_name.casefold()] = (game, fixed)
+        return patches
 
     # ---- SlotLock
 
