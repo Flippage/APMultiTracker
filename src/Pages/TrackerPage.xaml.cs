@@ -1649,7 +1649,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         // Checks whose logic is unknown: listed (with the reason) but never counted as in logic
         var unsure = App.Tracker.Slots.First(s => s.Locations.Any(l => l.IsUncertain));
         var q = unsure.Locations.First(l => l.IsUncertain);
-        if (unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded) || q.IsInLogic || string.IsNullOrEmpty(q.Note)
+        if (unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded && !l.Extra) || q.IsInLogic || string.IsNullOrEmpty(q.Note)
             || !unsure.Overview.Contains(q))
             throw new InvalidOperationException("An uncertain check is counted as in logic, has no reason, or is missing from its column.");
 
