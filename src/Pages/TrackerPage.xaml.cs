@@ -992,7 +992,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ItemsList.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         PretendArea.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         ItemsSortBtn.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
-        ItemsSortBtn.Text = ItemsSortLabel(ItemsSortMode) + " ▾";
+        ItemsSortBtn.ToolTip = "Sort: " + ItemsSortLabel(ItemsSortMode);
         EventsList.Visibility = events ? Visibility.Visible : Visibility.Collapsed;
         EventsEmpty.Visibility = events && s.Events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ItemsHeader.Foreground = (Brush)FindResource(events ? "SubBrush" : "AccentBrush");
@@ -1302,7 +1302,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     };
 
     /// <summary>Opens a small menu with the three orders under the "… ▾" label.</summary>
-    private void ItemsSort_Click(object sender, MouseButtonEventArgs e)
+    private void ItemsSort_Click(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu { PlacementTarget = ItemsSortBtn, Placement = PlacementMode.Bottom };
         foreach (var (mode, tip) in new[]
