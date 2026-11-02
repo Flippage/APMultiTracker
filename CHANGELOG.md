@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.2
+
+- **Resize the Items / Hints panel**: drag its left edge (a grip appears on hover) to make it wider or narrower, so
+  long item names fit. Remembered.
+- Hover an item you've received to see its full name (and how many).
+
 ## v0.12.1
 
 - **Items: "Progression, latest first"**: the sort button on the Items panel (the sort icon next to Events) opens a

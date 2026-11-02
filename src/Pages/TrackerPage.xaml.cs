@@ -787,6 +787,36 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException($"Docked feed ({App.Config.FeedDock}) has the wrong spacing: {FeedDock.Margin}.");
     }
 
+    // ------------------------------------------------------------------ resizing the Items / Hints column
+
+    private const double SideMin = 220;
+
+    /// <summary>The Items / Hints column's width: the one dragged to, else the default (wider with Hints).</summary>
+    private double SidePanelWidth(bool hints) =>
+        App.Config.SidePanelWidth >= SideMin ? ClampSide(App.Config.SidePanelWidth) : hints ? 330 : 280;
+
+    /// <summary>Leaves the check list at least 320 wide.</summary>
+    private double ClampSide(double width)
+    {
+        double room = FocusBody.ActualWidth > 0 ? FocusBody.ActualWidth - 320 : 900;
+        return Math.Max(SideMin, Math.Min(width, Math.Max(SideMin, room)));
+    }
+
+    private void SideResize_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        double width = ClampSide(ItemsCol.Width.Value - e.HorizontalChange);
+        if (Math.Abs(width - ItemsCol.Width.Value) < 0.5) return;
+        ItemsCol.Width = new GridLength(width);
+        App.Config.SidePanelWidth = width;
+        UpdateSideLayout();   // the lifted column (bottom feed dock) and the feed's margin follow
+    }
+
+    private void SideResize_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        App.Config.SidePanelWidth = Math.Round(ItemsCol.Width.Value);
+        App.SaveConfig();
+    }
+
     private void FeedSplit_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
         if (App.Config.FeedDock == "Bottom") App.Config.FeedDockHeight = Math.Round(FeedRow.ActualHeight);
@@ -859,7 +889,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FitExplainHeight();
         // Right-hand column: Items and/or Hints, stacked when both are on.
         bool items = ItemsToggle.IsChecked == true, hints = HintsToggle.IsChecked == true;
-        ItemsCol.Width = new GridLength(hints ? 330 : items ? 280 : 0);
+        ItemsCol.Width = new GridLength(items || hints ? SidePanelWidth(hints) : 0);
         ItemsPanel.Visibility = items ? Visibility.Visible : Visibility.Collapsed;
         HintsPanel.Visibility = hints ? Visibility.Visible : Visibility.Collapsed;
         ItemsRow.Height = items ? new GridLength(1, GridUnitType.Star) : new GridLength(0);

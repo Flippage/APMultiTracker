@@ -73,7 +73,11 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
 }
 
 /// <summary>An item received: how many, and <see cref="Last"/> = when the latest one arrived (higher is more recent).</summary>
-public sealed record ItemCount(string Name, int Count, bool Progression, int Last = -1);
+public sealed record ItemCount(string Name, int Count, bool Progression, int Last = -1)
+{
+    /// <summary>Hover text: the full name (the list trims long ones) and how many.</summary>
+    public string Tip => Count > 1 ? $"{Name} ×{Count}" : Name;
+}
 
 /// <summary>One of the game's items for "Where is my item?".</summary>
 public sealed record HintItem(string Name, int Total, int Left, bool Hinted, bool Found)

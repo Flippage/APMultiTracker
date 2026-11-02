@@ -25,6 +25,8 @@ public sealed class AppConfig
     public bool ShowFeedInTracker { get; set; }
     public string FeedDock { get; set; } = "Right";
     public double FeedDockWidth { get; set; } = 400;
+    /// <summary>Width of the focused game's Items / Hints column, dragged by its left edge (0 = default).</summary>
+    public double SidePanelWidth { get; set; }
     public double FeedDockHeight { get; set; } = 250;
 
     /// <summary>Archipelago game name → box art URL picked by the user.</summary>
