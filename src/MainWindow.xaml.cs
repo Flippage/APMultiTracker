@@ -129,7 +129,7 @@ public partial class MainWindow : Window
             {
                 int n = e.Key >= Key.NumPad0 ? e.Key - Key.NumPad0 : e.Key - Key.D0;
                 if (n == 0) App.Tracker.SetFocus(null);
-                else if (n <= App.Tracker.Slots.Count) App.Tracker.SetFocus(App.Tracker.Slots[n - 1]);
+                else if (n <= App.Tracker.Slots.Count) App.Tracker.SetFocus(App.Tracker.DisplayOrder[n - 1]);
                 else return;
                 GoToTracker();
                 e.Handled = true;

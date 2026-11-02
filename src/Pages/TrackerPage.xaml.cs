@@ -46,20 +46,20 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         DataContext = this;
         _view = new ListCollectionView(_checks);
         CheckListBox.ItemsSource = _view;
-        Tiles.ItemsSource = App.Tracker.Slots;
-        // All games: unlocked games first so they sit side by side; locked ones (SlotLock) after. Within each, the
-        // order the user dragged the columns into, then room order.
-        _columnsView = new ListCollectionView(App.Tracker.Slots);
-        _columnsView.SortDescriptions.Add(new SortDescription(nameof(SlotView.Locked), ListSortDirection.Ascending));
-        _columnsView.SortDescriptions.Add(new SortDescription(nameof(SlotView.ColumnRank), ListSortDirection.Ascending));
-        _columnsView.LiveSortingProperties.Add(nameof(SlotView.Locked));
-        _columnsView.LiveSortingProperties.Add(nameof(SlotView.ColumnRank));
-        _columnsView.IsLiveSorting = true;
+        // Game cards and All games columns share one order: unlocked games first, locked ones (SlotLock) after; within
+        // each, the order the user dragged them into, then room order.
+        _tilesView = GameOrderView();
+        _columnsView = GameOrderView();
+        Tiles.ItemsSource = _tilesView;
         Columns.ItemsSource = _columnsView;
-        Columns.MouseMove += Columns_MouseMove;
-        Columns.MouseLeftButtonUp += Columns_MouseUp;
-        Columns.LostMouseCapture += (_, _) => { if (_dragging) EndColumnDrag(false); };
-        PreviewKeyDown += (_, e) => { if (_dragging && e.Key == Key.Escape) { EndColumnDrag(false); e.Handled = true; } };
+        foreach (var host in new[] { Tiles, Columns })
+        {
+            // Preview: a card is a button, which captures the mouse and swallows its moves
+            host.PreviewMouseMove += (_, e) => DragMove(e);
+            host.PreviewMouseLeftButtonUp += (_, e) => DragUp(e);
+            host.LostMouseCapture += (_, _) => { if (_dragging && !host.IsMouseCaptured) EndDrag(false); };
+        }
+        PreviewKeyDown += (_, e) => { if (_dragging && e.Key == Key.Escape) { EndDrag(false); e.Handled = true; } };
         _dragScroll.Tick += (_, _) => DragAutoScroll();
         _scrollAnim.Tick += (_, _) => StepScrollAnimation();
         App.Tracker.Slots.CollectionChanged += (_, _) => ApplyColumnOrder(resort: false);
@@ -162,8 +162,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
 
     // ---------------------------------------------------------------- All games: column order and scrolling
 
-    private readonly ListCollectionView _columnsView;
-    private SlotView? _pressSlot;          // header pressed, not dragged yet
+    private readonly ListCollectionView _columnsView, _tilesView;
+    private ItemsControl? _dragHost;       // Tiles or Columns
+    private SlotView? _pressSlot;          // pressed, not dragged yet
     private Point _pressPoint;
     private bool _dragging;
     private int _dropIndex;
@@ -172,9 +173,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private readonly DispatcherTimer _scrollAnim = new() { Interval = TimeSpan.FromMilliseconds(15) };
     private double _scrollFrom, _scrollTo;
     private DateTime _scrollStart;
-    private const double ColumnGap = 10;   // each column's right margin
+    private const double ColumnGap = 10;   // each column's (and card's) right margin
     private const double ScrollAnimMs = 220;
-    /// <summary>Closed "grabbing" hand while a column is dragged (Windows has no built-in one).</summary>
+    /// <summary>Closed "grabbing" hand while a game is dragged (Windows has no built-in one).</summary>
     private static readonly Lazy<Cursor> GrabCursor = new(() =>
     {
         try
@@ -182,10 +183,21 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             var res = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/grab.cur"));
             return res == null ? Cursors.Hand : new Cursor(res.Stream, true);
         }
-        catch { return Cursors.Hand; }
+        catch (Exception ex) { Log.Error("ui", "Grab cursor", ex); return Cursors.Hand; }
     });
 
-    /// <summary>Ranks every game by the active multiworld's saved column order; games it doesn't list keep room order after them.</summary>
+    private static ListCollectionView GameOrderView()
+    {
+        var v = new ListCollectionView(App.Tracker.Slots);
+        v.SortDescriptions.Add(new SortDescription(nameof(SlotView.Locked), ListSortDirection.Ascending));
+        v.SortDescriptions.Add(new SortDescription(nameof(SlotView.ColumnRank), ListSortDirection.Ascending));
+        v.LiveSortingProperties.Add(nameof(SlotView.Locked));
+        v.LiveSortingProperties.Add(nameof(SlotView.ColumnRank));
+        v.IsLiveSorting = true;
+        return v;
+    }
+
+    /// <summary>Ranks every game by the active multiworld's saved order; games it doesn't list keep room order after them.</summary>
     /// <param name="resort">Re-sort now (live sorting only catches up later); not while the slot list itself is changing.</param>
     private void ApplyColumnOrder(bool resort = true)
     {
@@ -197,13 +209,13 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             int rank = i >= 0 ? i : 100_000 + s.Index;
             if (s.ColumnRank != rank) { s.ColumnRank = rank; changed = true; }
         }
-        if (changed && resort) _columnsView.Refresh();
+        if (changed && resort) { _columnsView.Refresh(); _tilesView.Refresh(); }
     }
 
     private List<SlotView> ColumnOrderNow() => _columnsView.Cast<SlotView>().ToList();
 
-    /// <summary>Moves a game's column to an insertion point (0 = first, Count = last) and remembers the order.
-    /// A locked game can't move in among the unlocked ones (or the other way round): they stay grouped.</summary>
+    /// <summary>Moves a game to an insertion point (0 = first, Count = last) in the shared card/column order and
+    /// remembers it. Locked games stay after the unlocked ones whatever the drop point.</summary>
     private void MoveColumn(SlotView slot, int insertAt)
     {
         var mw = App.Tracker.Active;
@@ -220,77 +232,120 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ApplyColumnOrder();
     }
 
-    private void Column_MouseDown(object sender, MouseButtonEventArgs e)
+    private void Column_MouseDown(object sender, MouseButtonEventArgs e) => PressGame(sender, e, Columns);
+    private void Tile_MouseDown(object sender, MouseButtonEventArgs e) => PressGame(sender, e, Tiles);
+
+    private void PressGame(object sender, MouseButtonEventArgs e, ItemsControl host)
     {
         if ((sender as FrameworkElement)?.DataContext is not SlotView s || App.Tracker.Slots.Count < 2) return;
         _pressSlot = s;
-        _pressPoint = e.GetPosition(Columns);
+        _dragHost = host;
+        _pressPoint = e.GetPosition(host);
     }
 
-    private void Columns_MouseMove(object sender, MouseEventArgs e)
+    private void DragMove(MouseEventArgs e)
     {
-        if (_pressSlot == null) return;
-        if (e.LeftButton != MouseButtonState.Pressed) { _pressSlot = null; if (_dragging) EndColumnDrag(false); return; }
-        var p = e.GetPosition(Columns);
+        if (_pressSlot == null || _dragHost == null) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { if (_dragging) EndDrag(false); _pressSlot = null; return; }
+        var host = _dragHost;
+        var p = e.GetPosition(host);
         if (!_dragging)
         {
             if (Math.Abs(p.X - _pressPoint.X) < 8 && Math.Abs(p.Y - _pressPoint.Y) < 8) return;
             _dragging = true;
-            Columns.CaptureMouse();
-            if (Columns.ItemContainerGenerator.ContainerFromItem(_pressSlot) is UIElement c) c.Opacity = 0.45;
+            host.CaptureMouse();   // takes the mouse from a pressed card, so letting go doesn't click it
+            if (host.ItemContainerGenerator.ContainerFromItem(_pressSlot) is UIElement c) c.Opacity = 0.45;
             Mouse.OverrideCursor = GrabCursor.Value;
-            DropMarker.Height = Columns.ActualHeight;
-            DropMarker.Visibility = Visibility.Visible;
-            _dragScroll.Start();
+            Marker.Visibility = Visibility.Visible;
+            if (host == Columns) _dragScroll.Start();
         }
         UpdateDropMarker(p);
-        // Near the visible edges: keep scrolling while the pointer stays there
-        double x = e.GetPosition(OverviewScroll).X, edge = 60, w = OverviewScroll.ActualWidth;
-        _dragScrollSpeed = x < edge ? -(edge - x) / 3 : x > w - edge ? (x - (w - edge)) / 3 : 0;
+        if (host == Columns)
+        {
+            // Near the visible edges: keep scrolling while the pointer stays there
+            double x = e.GetPosition(OverviewScroll).X, edge = 60, w = OverviewScroll.ActualWidth;
+            _dragScrollSpeed = x < edge ? -(edge - x) / 3 : x > w - edge ? (x - (w - edge)) / 3 : 0;
+        }
+        e.Handled = true;
     }
 
+    private Border Marker => _dragHost == Tiles ? TileDropMarker : DropMarker;
+
+    /// <summary>Bounds of each game's card or column, in the host's coordinates, in display order.</summary>
+    private List<(SlotView Slot, Rect Box)> GameBoxes(ItemsControl host)
+    {
+        var list = new List<(SlotView, Rect)>();
+        foreach (var item in host.Items)
+            if (item is SlotView s && host.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement c && c.IsVisible)
+                list.Add((s, c.TransformToAncestor(host).TransformBounds(new Rect(c.RenderSize))));
+        return list;
+    }
+
+    /// <summary>Works out where a drop at p lands (cards wrap into rows: the row under the pointer, then before or after
+    /// the card under it) and moves the marker there.</summary>
     private void UpdateDropMarker(Point p)
     {
-        if (_pressSlot == null) return;
-        var order = ColumnOrderNow();
-        int n = order.Count;
+        if (_pressSlot == null || _dragHost == null) return;
+        var boxes = GameBoxes(_dragHost);
+        int n = boxes.Count;
         if (n == 0) return;
-        double colW = Columns.ActualWidth / n;
-        int unlocked = order.Count(s => !s.Locked);
+        // Row: the one the pointer is in, else the nearest
+        double rowTop = boxes.Select(b => b.Box.Top).Distinct()
+            .OrderBy(t => p.Y >= t && p.Y < t + boxes.First(b => b.Box.Top == t).Box.Height ? 0 : 1)
+            .ThenBy(t => Math.Abs(p.Y - (t + boxes.First(b => b.Box.Top == t).Box.Height / 2))).First();
+        var row = Enumerable.Range(0, n).Where(i => Math.Abs(boxes[i].Box.Top - rowTop) < 1).ToList();
+        int index = row.FirstOrDefault(i => p.X < boxes[i].Box.Left + (boxes[i].Box.Width - ColumnGap) / 2, -1);
+        bool atRowEnd = index < 0;
+        if (atRowEnd) index = row[^1] + 1;
+
+        int unlocked = boxes.Count(b => !b.Slot.Locked);
         int lo = _pressSlot.Locked ? unlocked : 0, hi = _pressSlot.Locked ? n : unlocked;
-        _dropIndex = Math.Clamp((int)Math.Round(p.X / colW), lo, hi);
-        Canvas.SetLeft(DropMarker, Math.Clamp(_dropIndex * colW - ColumnGap / 2 - 1.5, 0, Math.Max(0, Columns.ActualWidth - ColumnGap - 3)));
+        if (index > hi) { index = hi; atRowEnd = index > 0; }        // marker after the last game it may follow
+        else if (index < lo) { index = lo; atRowEnd = false; }       // marker before the first game it may precede
+        _dropIndex = index;
+
+        // Marker: in the gap before that game, or after the last game of its row
+        Rect at = atRowEnd || index == n ? boxes[index - 1].Box : boxes[index].Box;
+        double x = atRowEnd || index == n ? at.Right - ColumnGap / 2 : at.Left - ColumnGap / 2;
+        double h = _dragHost == Tiles ? at.Height - 10 : Columns.ActualHeight;   // cards have a 10px bottom margin
+        Marker.Height = Math.Max(0, h);
+        Canvas.SetTop(Marker, _dragHost == Tiles ? at.Top : 0);
+        Canvas.SetLeft(Marker, Math.Max(0, x - 1.5));
     }
 
     private void DragAutoScroll()
     {
-        if (!_dragging || _dragScrollSpeed == 0) return;
+        if (!_dragging || _dragHost != Columns || _dragScrollSpeed == 0) return;
         OverviewScroll.ScrollToHorizontalOffset(Math.Clamp(OverviewScroll.HorizontalOffset + _dragScrollSpeed, 0, OverviewScroll.ScrollableWidth));
         UpdateDropMarker(Mouse.GetPosition(Columns));
     }
 
-    private void Columns_MouseUp(object sender, MouseButtonEventArgs e)
+    private void DragUp(MouseButtonEventArgs e)
     {
-        if (_dragging)
+        if (_dragging && _dragHost != null)
         {
-            UpdateDropMarker(e.GetPosition(Columns));
-            EndColumnDrag(true);
+            UpdateDropMarker(e.GetPosition(_dragHost));
+            EndDrag(true);
             e.Handled = true;   // not a click: don't focus the game
         }
         _pressSlot = null;
     }
 
-    private void EndColumnDrag(bool commit)
+    private void EndDrag(bool commit)
     {
         var slot = _pressSlot;
+        var host = _dragHost;
         _dragging = false;
         _pressSlot = null;
         _dragScroll.Stop();
         _dragScrollSpeed = 0;
-        DropMarker.Visibility = Visibility.Collapsed;
+        DropMarker.Visibility = TileDropMarker.Visibility = Visibility.Collapsed;
         Mouse.OverrideCursor = null;
-        if (slot != null && Columns.ItemContainerGenerator.ContainerFromItem(slot) is UIElement c) c.Opacity = 1;
-        if (Columns.IsMouseCaptured) Columns.ReleaseMouseCapture();
+        if (host != null)
+        {
+            if (slot != null && host.ItemContainerGenerator.ContainerFromItem(slot) is UIElement c) c.Opacity = 1;
+            if (host.IsMouseCaptured) host.ReleaseMouseCapture();
+        }
         if (commit && slot != null) MoveColumn(slot, _dropIndex);
     }
 
@@ -1488,8 +1543,27 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException("Dragging a column didn't move it.");
         if (mw.ColumnOrder.FirstOrDefault() != order[1].Ref.Id)
             throw new InvalidOperationException("The column order wasn't remembered.");
+        if (!_tilesView.Cast<SlotView>().SequenceEqual(ColumnOrderNow()))
+            throw new InvalidOperationException("The game cards aren't in the same order as the columns.");
+        if (App.Tracker.DisplayOrder[0] != order[1]) throw new InvalidOperationException("Ctrl+1 doesn't follow the order.");
         MoveColumn(first, 0);
         if (ColumnOrderNow()[0] != first) throw new InvalidOperationException("Dragging a column back didn't move it.");
+
+        // Dropping on a card: before it on its left half, after the last card of a row on its right
+        UpdateLayout();
+        var boxes = GameBoxes(Tiles);
+        if (boxes.Count == order.Count)
+        {
+            _dragHost = Tiles;
+            _pressSlot = first;
+            var last = boxes[^1].Box;
+            UpdateDropMarker(new Point(last.Right - 12, last.Top + 5));
+            if (_dropIndex != boxes.Count) throw new InvalidOperationException($"Dropping past the last card lands at {_dropIndex}.");
+            UpdateDropMarker(new Point(boxes[0].Box.Left + 2, boxes[0].Box.Top + 5));
+            if (_dropIndex != 0) throw new InvalidOperationException($"Dropping on the first card's left lands at {_dropIndex}.");
+            _pressSlot = null;
+            _dragHost = null;
+        }
 
         Columns.Width = Math.Max(OverviewScroll.ActualWidth, 0) + 3 * 270;   // force sideways scrolling
         UpdateLayout();

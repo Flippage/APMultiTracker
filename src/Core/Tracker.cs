@@ -540,12 +540,16 @@ public sealed class TrackerStore
     }
 
     /// <summary>Step through overview → game 1 → game 2 … (wrapping).</summary>
+    /// <summary>Games in the order the cards and columns show them: unlocked first, then the user's drag order.</summary>
+    public List<SlotView> DisplayOrder => Slots.OrderBy(s => s.Locked).ThenBy(s => s.ColumnRank).ToList();
+
     public void CycleFocus(int delta)
     {
-        int n = Slots.Count + 1;
-        int cur = Focused == null ? 0 : Slots.IndexOf(Focused) + 1;
+        var order = DisplayOrder;
+        int n = order.Count + 1;
+        int cur = Focused == null ? 0 : order.IndexOf(Focused) + 1;
         int next = ((cur + delta) % n + n) % n;
-        SetFocus(next == 0 ? null : Slots[next - 1]);
+        SetFocus(next == 0 ? null : order[next - 1]);
     }
 
     // ------------------------------------------------------------------ multiworlds

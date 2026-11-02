@@ -356,6 +356,7 @@
                     </StackPanel>
                 </Grid>
             </RadioButton>
+            <Grid>
             <ItemsControl x:Name="Tiles" Focusable="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -366,10 +367,15 @@
                     <DataTemplate DataType="{x:Type local:SlotView}">
                         <RadioButton Style="{StaticResource GameTab}" Margin="0,0,0,10" Content="{Binding}"
                                      ContentTemplate="{StaticResource GameTile}" Checked="Tile_Checked" Loaded="Tile_Loaded"
-                                     ToolTip="{Binding StatusDetail}"/>
+                                     PreviewMouseLeftButtonDown="Tile_MouseDown" ToolTip="{Binding StatusDetail}"/>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- Where a dragged card will land -->
+            <Canvas IsHitTestVisible="False">
+                <Border x:Name="TileDropMarker" Width="3" CornerRadius="1.5" Background="{StaticResource AccentBrush}" Visibility="Collapsed"/>
+            </Canvas>
+            </Grid>
         </DockPanel>
 
         <!-- ===================== All games ===================== -->

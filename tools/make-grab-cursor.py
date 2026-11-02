@@ -4,6 +4,7 @@ import struct, io, sys
 from PIL import Image, ImageDraw, ImageFilter
 
 S = 256  # drawing scale (canvas 256 -> cursor 32: 8x)
+SCALE = 0.7  # hand size within the cursor
 def fist(stroke, fill):
     im = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
@@ -19,10 +20,10 @@ def fist(stroke, fill):
             rr(x-g, 7-g, x+4.4+g, 15+g, 2.2+g, fill=color)
         # thumb along the left
         rr(5-g, 12.5-g, 10+g, 21+g, 2.5+g, fill=color)
-    body(1.7, stroke)
+    body(2.3, stroke)
     body(0, fill)
     # finger separations
-    w = 1.4 * k
+    w = 1.9 * k
     for x in (13.7, 17.7, 21.7):
         d.line([x*k, 9.5*k, x*k, 15*k], fill=stroke, width=round(w))
     # thumb crease
@@ -31,6 +32,11 @@ def fist(stroke, fill):
 
 def frames():
     big = fist((0, 0, 0, 255), (255, 255, 255, 255))
+    # Shrink the hand to about the size of Windows' own hand pointer, centred on the hotspot
+    f = SCALE
+    small = big.resize((round(S * f), round(S * f)), Image.LANCZOS)
+    big = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    big.alpha_composite(small, (round((S - small.width) / 2), round((S - small.height) / 2)))
     out = []
     for size in (32, 48, 64):
         out.append(big.resize((size, size), Image.LANCZOS))

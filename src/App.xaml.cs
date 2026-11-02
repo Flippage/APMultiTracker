@@ -80,7 +80,8 @@ public partial class App : Application
         {
             LogError("Startup", ex);
             if (_selfTest) { Console.Error.WriteLine(ex); Shutdown(1); return; }
-            MessageBox.Show("APMultiTracker couldn't start.\n\n" + ex.GetBaseException().Message +
+            var root = ex.GetBaseException();
+            MessageBox.Show("APMultiTracker couldn't start.\n\n" + (string.IsNullOrWhiteSpace(root.Message) ? root.GetType().Name : root.Message) +
                             "\n\nDetails were saved to:\n" + ErrorLogPath, "APMultiTracker",
                             MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
