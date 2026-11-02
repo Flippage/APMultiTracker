@@ -4,7 +4,8 @@
 
 - **Current area** (engine v0.4.14): for games whose client reports where you are, the checks in the area you're
   standing in move to the top of the game's list under **📍 Current area: …** (and to the top of its All games
-  column), each tagged **HERE**. The game's header and column show where you are and how many checks are left there.
+  column), under one **📍 Current area** heading. The game's header and column show where you are and what's
+  left there: **📍 Route 115 · 10 checks here · 3 in logic · 1 glitched** (in logic in green, glitched in yellow).
   Works while the game's own client is connected, for:
   - **Pokémon Emerald**: the exact map (e.g. Route 104, or a single house). Shows up once you next change map.
   - **The Minish Cap**: the exact room.

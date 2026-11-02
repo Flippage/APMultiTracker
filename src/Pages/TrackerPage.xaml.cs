@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -439,8 +440,10 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         FTitle.Text = s.Title;
         FSub.Text = $"Slot · {s.SlotName}" + (s.Items.Count > 0 ? $" · {s.Items.Sum(i => i.Count)} items received" : "");
         FArea.Visibility = s.ShowAreaLine ? Visibility.Visible : Visibility.Collapsed;
-        FArea.Text = s.AreaText;
-        FArea.Foreground = s.AreaBrush;
+        FArea.Inlines.Clear();
+        FArea.Inlines.Add(new Run(s.AreaText) { Foreground = s.AreaBrush });
+        if (s.AreaInLogicText.Length > 0) FArea.Inlines.Add(new Run(s.AreaInLogicText) { Foreground = Brushes2.InLogic });
+        if (s.AreaGlitchedText.Length > 0) FArea.Inlines.Add(new Run(s.AreaGlitchedText) { Foreground = Brushes2.Glitched });
         // A wrapping tooltip: the reason can be a few sentences long
         FArea.ToolTip = string.IsNullOrEmpty(s.AreaTip) ? null : new TextBlock { Text = s.AreaTip, TextWrapping = TextWrapping.Wrap, MaxWidth = 440 };
         Art.SetUrl(FArt, s.ArtUrl);
@@ -844,7 +847,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         using (_view.DeferRefresh())
         {
             _view.GroupDescriptions.Clear();
-            if (App.Config.GroupByRegion) _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CheckItem.GroupKey)));
+            _view.GroupDescriptions.Add(new PropertyGroupDescription(App.Config.GroupByRegion ? nameof(CheckItem.GroupKey) : nameof(CheckItem.HereGroup)));
         }
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowRegionLine)));
         bool explain = ExplainToggle.IsChecked == true;
@@ -1623,6 +1626,8 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         var here = slot.Locations.Where(l => l.Here).ToList();
         if (here.Count != 3 || slot.HereCount != 3 || !slot.AreaText.Contains(slot.AreaName))
             throw new InvalidOperationException($"Current area marks {here.Count} checks (expected 3).");
+        if (slot.HereInLogic != 2 || slot.AreaInLogicText != " · 2 in logic" || slot.AreaGlitchedText != "")
+            throw new InvalidOperationException($"Current area counts “{slot.AreaInLogicText}{slot.AreaGlitchedText}” (expected 2 in logic, none glitched).");
         App.Tracker.SetFocus(slot);
         FInLogicPill.IsChecked = false;
         FAllPill.IsChecked = true;

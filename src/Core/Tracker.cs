@@ -19,6 +19,8 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public bool Here => HereArea != null;
     /// <summary>Region heading, with the player's current area first under its own heading.</summary>
     public string GroupKey => HereArea != null ? "📍 Current area: " + HereArea : Region;
+    /// <summary>Without region groups: the current area's checks under one heading, the rest with none.</summary>
+    public string HereGroup => HereArea != null ? "📍 Current area: " + HereArea : "";
     /// <summary>The location's real name (Name may include an alias), for explain / logical path.</summary>
     public string LookupName => string.IsNullOrEmpty(Key) ? Name : Key;
     public bool IsHidden => Status == "ignored";
@@ -138,8 +140,8 @@ public sealed class SlotView : INotifyPropertyChanged
         Ref = slot;
         _game = slot.Game;
         OverviewView = new System.Windows.Data.ListCollectionView(Overview);
-        if (App.Config.OverviewGroupByRegion)
-            OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.GroupKey)));
+        OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(
+            App.Config.OverviewGroupByRegion ? nameof(CheckItem.GroupKey) : nameof(CheckItem.HereGroup)));
     }
 
     private string _game;
@@ -182,6 +184,9 @@ public sealed class SlotView : INotifyPropertyChanged
     public bool ShowAreaLine => AreaState.Length > 0;
     /// <summary>Checks left in the current area.</summary>
     public int HereCount { get; private set; }
+    /// <summary>Of those: in logic, and glitched (excluded checks don't count, as elsewhere).</summary>
+    public int HereInLogic { get; private set; }
+    public int HereGlitched { get; private set; }
     public string AreaText => AreaState switch
     {
         "" => "",
@@ -190,7 +195,10 @@ public sealed class SlotView : INotifyPropertyChanged
         "unavailable" => "📍 Area: unavailable",
         _ => "📍 Area: not reported",
     };
-    public string AreaTip => HasArea ? AreaText : AreaDetail;
+    /// <summary>The area line's coloured parts: " · N in logic" (green) and " · N glitched" (yellow, when any).</summary>
+    public string AreaInLogicText => HasArea && HereCount > 0 ? $" · {HereInLogic} in logic" : "";
+    public string AreaGlitchedText => HasArea && HereGlitched > 0 ? $" · {HereGlitched} glitched" : "";
+    public string AreaTip => HasArea ? AreaText + AreaInLogicText + AreaGlitchedText : AreaDetail;
     public Brush AreaBrush => HasArea ? Brushes2.Accent : Brushes2.Sub;
 
     /// <summary>Locked by a SlotLock player: nothing in this game counts as in logic until its unlock item arrives.</summary>
@@ -241,8 +249,8 @@ public sealed class SlotView : INotifyPropertyChanged
         using (OverviewView.DeferRefresh())
         {
             OverviewView.GroupDescriptions.Clear();
-            if (App.Config.OverviewGroupByRegion)
-                OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(CheckItem.GroupKey)));
+            OverviewView.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(
+                App.Config.OverviewGroupByRegion ? nameof(CheckItem.GroupKey) : nameof(CheckItem.HereGroup)));
         }
         ListSync.Sync(Overview, SortOverview(Locations));
     }
@@ -410,7 +418,9 @@ public sealed class SlotView : INotifyPropertyChanged
         }
         if (!HasArea) here.Clear();
         if (here.Count > 0) locs = locs.Select(l => here.Contains(l.Id) ? l with { HereArea = AreaName } : l).ToList();
-        HereCount = locs.Count(l => l.Here && !l.IsHidden);
+        HereCount = locs.Count(l => l.Here && !l.IsHidden && !l.IsEntrance);
+        HereInLogic = locs.Count(l => l.Here && l.IsInLogic && !l.Excluded);
+        HereGlitched = locs.Count(l => l.Here && l.IsGlitched && !l.Excluded);
         Entrances = locs.Count(l => l.IsEntrance);
         // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
         InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);

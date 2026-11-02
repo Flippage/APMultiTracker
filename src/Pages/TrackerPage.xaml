@@ -66,6 +66,10 @@
                                     <ItemsPresenter x:Name="Items"/>
                                 </StackPanel>
                                 <ControlTemplate.Triggers>
+                                    <!-- The unnamed group (checks outside the current area, without region groups) has no heading -->
+                                    <DataTrigger Binding="{Binding Name}" Value="">
+                                        <Setter TargetName="Head" Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
                                     <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
                                         <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
                                     </Trigger>
@@ -101,6 +105,10 @@
                                     <ItemsPresenter x:Name="Items"/>
                                 </StackPanel>
                                 <ControlTemplate.Triggers>
+                                    <!-- The unnamed group (checks outside the current area, without region groups) has no heading -->
+                                    <DataTrigger Binding="{Binding Name}" Value="">
+                                        <Setter TargetName="Head" Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
                                     <Trigger SourceName="Head" Property="IsMouseOver" Value="True">
                                         <Setter TargetName="Head" Property="Background" Value="{StaticResource HoverBrush}"/>
                                     </Trigger>
@@ -132,13 +140,6 @@
                         <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource EntranceDimBrush}" ToolTip="{Binding StatusTip}">
                             <TextBlock FontSize="11.5" Foreground="{StaticResource EntranceBrush}" TextTrimming="CharacterEllipsis">
                                 <Run Text="NEW ENTRANCE" FontWeight="Bold"/>
-                            </TextBlock>
-                        </Border>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Visibility="{Binding Here, Converter={StaticResource Vis}}" Margin="0,3,0,1">
-                        <Border CornerRadius="6" Padding="7,1,7,2" Background="{StaticResource AccentDimBrush}" ToolTip="In the area you're in right now">
-                            <TextBlock FontSize="11.5" Foreground="{StaticResource AccentBrush}" TextTrimming="CharacterEllipsis">
-                                <Run Text="📍 HERE" FontWeight="Bold"/><Run Text="  "/><Run Text="{Binding HereArea, Mode=OneWay}"/>
                             </TextBlock>
                         </Border>
                     </StackPanel>
@@ -174,10 +175,6 @@
         <DataTemplate x:Key="MiniRow" DataType="{x:Type local:CheckItem}">
             <DockPanel ToolTip="{Binding Name}">
                 <Ellipse Width="6" Height="6" Fill="{Binding DotBrush}" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,9,0"/>
-                <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource AccentDimBrush}"
-                        VerticalAlignment="Center" Visibility="{Binding Here, Converter={StaticResource Vis}}" ToolTip="{Binding HereArea}">
-                    <TextBlock Text="HERE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                </Border>
                 <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource HintDimBrush}"
                         VerticalAlignment="Center" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" ToolTip="{Binding Hint}">
                     <TextBlock Text="HINT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>
@@ -460,8 +457,11 @@
                                             <TextBlock FontSize="11.5" Foreground="{StaticResource SubBrush}" TextTrimming="CharacterEllipsis">
                                                 <Run Text="{Binding SlotName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CheckedText, Mode=OneWay}"/>
                                             </TextBlock>
-                                            <TextBlock Text="{Binding AreaText}" FontSize="11.5" Foreground="{Binding AreaBrush}" TextTrimming="CharacterEllipsis"
+                                            <TextBlock FontSize="11.5" TextTrimming="CharacterEllipsis"
                                                        Visibility="{Binding ShowAreaLine, Converter={StaticResource Vis}}" ToolTipService.ShowDuration="60000">
+                                                <Run Text="{Binding AreaText, Mode=OneWay}" Foreground="{Binding AreaBrush, Mode=OneWay}"/><Run
+                                                     Text="{Binding AreaInLogicText, Mode=OneWay}" Foreground="{StaticResource InLogicBrush}"/><Run
+                                                     Text="{Binding AreaGlitchedText, Mode=OneWay}" Foreground="{StaticResource GlitchedBrush}"/>
                                                 <TextBlock.ToolTip>
                                                     <ToolTip>
                                                         <TextBlock Text="{Binding AreaTip}" TextWrapping="Wrap" MaxWidth="440"/>
