@@ -992,7 +992,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ItemsList.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         PretendArea.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
         ItemsSortBtn.Visibility = events ? Visibility.Collapsed : Visibility.Visible;
-        ItemsSortBtn.Text = App.Config.ItemsLatestFirst ? "Latest first ▾" : "A–Z ▾";
+        ItemsSortBtn.Text = ItemsSortLabel(ItemsSortMode) + " ▾";
         EventsList.Visibility = events ? Visibility.Visible : Visibility.Collapsed;
         EventsEmpty.Visibility = events && s.Events.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ItemsHeader.Foreground = (Brush)FindResource(events ? "SubBrush" : "AccentBrush");
@@ -1281,14 +1281,49 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         PretendError.Visibility = error != null ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    /// <summary>A-Z (progression items first), or newest first.</summary>
-    private static IReadOnlyList<ItemCount> SortedItems(SlotView s) => App.Config.ItemsLatestFirst
-        ? s.Items.OrderByDescending(i => i.Last).ThenBy(i => i.Name, NaturalComparer.Instance).ToList()
-        : s.Items;
+    /// <summary>The Items list's order: "az", "prog_latest" or "latest" (older configs only had latest-first on/off).</summary>
+    private static string ItemsSortMode =>
+        App.Config.ItemsSort is "az" or "prog_latest" or "latest" ? App.Config.ItemsSort : App.Config.ItemsLatestFirst ? "latest" : "az";
 
+    private static string ItemsSortLabel(string mode) => mode switch
+    {
+        "prog_latest" => "Progression, latest first",
+        "latest" => "Latest first",
+        _ => "A–Z",
+    };
+
+    /// <summary>A-Z (progression items first), progression first then newest first, or newest first.</summary>
+    private static IReadOnlyList<ItemCount> SortedItems(SlotView s) => ItemsSortMode switch
+    {
+        "prog_latest" => s.Items.OrderByDescending(i => i.Progression).ThenByDescending(i => i.Last)
+                                .ThenBy(i => i.Name, NaturalComparer.Instance).ToList(),
+        "latest" => s.Items.OrderByDescending(i => i.Last).ThenBy(i => i.Name, NaturalComparer.Instance).ToList(),
+        _ => s.Items,
+    };
+
+    /// <summary>Opens a small menu with the three orders under the "… ▾" label.</summary>
     private void ItemsSort_Click(object sender, MouseButtonEventArgs e)
     {
-        App.Config.ItemsLatestFirst = !App.Config.ItemsLatestFirst;
+        var menu = new ContextMenu { PlacementTarget = ItemsSortBtn, Placement = PlacementMode.Bottom };
+        foreach (var (mode, tip) in new[]
+                 {
+                     ("az", "Progression items first, then A to Z"),
+                     ("prog_latest", "Progression items first, each group newest first"),
+                     ("latest", "Newest first, progression or not"),
+                 })
+        {
+            var item = new MenuItem { Header = ItemsSortLabel(mode), IsCheckable = true, IsChecked = ItemsSortMode == mode, ToolTip = tip };
+            item.Click += (_, _) => SetItemsSort(mode);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void SetItemsSort(string mode)
+    {
+        App.Config.ItemsSort = mode;
+        App.Config.ItemsLatestFirst = mode == "latest";
         App.SaveConfig();
         if (_shown == null) return;
         ItemsList.ItemsSource = SortedItems(_shown);
@@ -1532,6 +1567,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         SelfTestOverviewGlitched();
         SelfTestSlotLock();
         SelfTestCurrentArea();
+        SelfTestItemsSort();
         App.Tracker.SetFocus(null);
         UpdateLayout();
         SelfTestColumns();
@@ -1617,6 +1653,21 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException("Unlocking a SlotLock-locked game didn't bring its checks back.");
         if (App.Tracker.Live.First(l => l.World.Id == room).Feed.Count != feedBefore + 1)
             throw new InvalidOperationException("Unlocking a game didn't say so in the feed.");
+    }
+
+    /// <summary>Self-test: "Progression, latest first" puts progression items first, each group newest first.</summary>
+    private void SelfTestItemsSort()
+    {
+        var slot = App.Tracker.Slots.First(s => s.Items.Any(i => i.Progression) && s.Items.Any(i => !i.Progression));
+        string saved = App.Config.ItemsSort;
+        App.Config.ItemsSort = "prog_latest";
+        var list = SortedItems(slot);
+        App.Config.ItemsSort = saved;
+        int firstOther = list.ToList().FindIndex(i => !i.Progression);
+        bool progFirst = list.Skip(firstOther).All(i => !i.Progression);
+        bool newestFirst = list.Take(firstOther).Zip(list.Take(firstOther).Skip(1)).All(p => p.First.Last >= p.Second.Last)
+                           && list.Skip(firstOther).Zip(list.Skip(firstOther).Skip(1)).All(p => p.First.Last >= p.Second.Last);
+        if (!progFirst || !newestFirst) throw new InvalidOperationException("“Progression, latest first” isn't sorted that way.");
     }
 
     /// <summary>Self-test: a game that reports where the player is lists that area's checks first, under its own heading.</summary>

@@ -68,8 +68,11 @@ public sealed class AppConfig
     public bool ShowFoundHints { get; set; }
     /// <summary>The Items panel's tab: received items, or events (UT's /event_inventory).</summary>
     public bool ShowEvents { get; set; }
-    /// <summary>Items received: newest first instead of A-Z.</summary>
+    /// <summary>Items received: newest first instead of A-Z (older setting; ItemsSort replaces it).</summary>
     public bool ItemsLatestFirst { get; set; }
+    /// <summary>Items received: "az" (progression first, then A-Z), "prog_latest" (progression first, each newest
+    /// first) or "latest" (newest first). Empty = from ItemsLatestFirst.</summary>
+    public string ItemsSort { get; set; } = "";
     public bool ShowExplain { get; set; }
 
     // ---- app

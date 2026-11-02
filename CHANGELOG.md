@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.1
+
+- **Items: "Progression, latest first"**: the sort menu on the Items panel (click **A–Z ▾**) now has three orders:
+  **A–Z** (progression items first, then A to Z, as before), **Progression, latest first** (progression items first,
+  each group newest first) and **Latest first** (newest first, progression or not, as before). Remembered.
+
 ## v0.12.0
 
 Engine v0.4.17.
