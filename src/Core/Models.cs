@@ -92,6 +92,8 @@ public sealed class Multiworld
     /// <summary>Folder with the players' YAMLs (only needed by games that can't rebuild without one).</summary>
     public string YamlFolder { get; set; } = "";
     public List<SlotRef> Slots { get; set; } = new();
+    /// <summary>All games column order the user dragged into place (slot ids, left to right). Slots not listed go last.</summary>
+    public List<string> ColumnOrder { get; set; } = new();
 }
 
 public sealed class SlotRef

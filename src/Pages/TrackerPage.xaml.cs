@@ -47,13 +47,22 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         _view = new ListCollectionView(_checks);
         CheckListBox.ItemsSource = _view;
         Tiles.ItemsSource = App.Tracker.Slots;
-        // All games: unlocked games first so they sit side by side; locked ones (SlotLock) after, in room order
-        var columns = new ListCollectionView(App.Tracker.Slots);
-        columns.SortDescriptions.Add(new SortDescription(nameof(SlotView.Locked), ListSortDirection.Ascending));
-        columns.SortDescriptions.Add(new SortDescription(nameof(SlotView.Index), ListSortDirection.Ascending));
-        columns.LiveSortingProperties.Add(nameof(SlotView.Locked));
-        columns.IsLiveSorting = true;
-        Columns.ItemsSource = columns;
+        // All games: unlocked games first so they sit side by side; locked ones (SlotLock) after. Within each, the
+        // order the user dragged the columns into, then room order.
+        _columnsView = new ListCollectionView(App.Tracker.Slots);
+        _columnsView.SortDescriptions.Add(new SortDescription(nameof(SlotView.Locked), ListSortDirection.Ascending));
+        _columnsView.SortDescriptions.Add(new SortDescription(nameof(SlotView.ColumnRank), ListSortDirection.Ascending));
+        _columnsView.LiveSortingProperties.Add(nameof(SlotView.Locked));
+        _columnsView.LiveSortingProperties.Add(nameof(SlotView.ColumnRank));
+        _columnsView.IsLiveSorting = true;
+        Columns.ItemsSource = _columnsView;
+        Columns.MouseMove += Columns_MouseMove;
+        Columns.MouseLeftButtonUp += Columns_MouseUp;
+        Columns.LostMouseCapture += (_, _) => { if (_dragging) EndColumnDrag(false); };
+        PreviewKeyDown += (_, e) => { if (_dragging && e.Key == Key.Escape) { EndColumnDrag(false); e.Handled = true; } };
+        _dragScroll.Tick += (_, _) => DragAutoScroll();
+        _scrollAnim.Tick += (_, _) => StepScrollAnimation();
+        App.Tracker.Slots.CollectionChanged += (_, _) => ApplyColumnOrder();
 
         _searchDebounce.Tick += (_, _) => { _searchDebounce.Stop(); RefreshList(); };
         App.Tracker.Changed += OnTrackerChanged;
@@ -112,6 +121,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     {
         var store = App.Tracker;
         var mw = store.Active;
+        ApplyColumnOrder();
         TitleText.Text = mw?.Name ?? "Tracker";
         SubText.Text = mw == null ? "No multiworld active" : $"{mw.Server} · {store.Slots.Count} game{(store.Slots.Count == 1 ? "" : "s")}";
         bool hasGames = store.Slots.Count > 0;
@@ -150,6 +160,177 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         AllCount.Text = slots.Any(s => s.HasData) ? slots.Sum(s => s.ToDo).ToString() : "–";
     }
 
+    // ---------------------------------------------------------------- All games: column order and scrolling
+
+    private readonly ListCollectionView _columnsView;
+    private SlotView? _pressSlot;          // header pressed, not dragged yet
+    private Point _pressPoint;
+    private bool _dragging;
+    private int _dropIndex;
+    private readonly DispatcherTimer _dragScroll = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private double _dragScrollSpeed;
+    private readonly DispatcherTimer _scrollAnim = new() { Interval = TimeSpan.FromMilliseconds(15) };
+    private double _scrollFrom, _scrollTo;
+    private DateTime _scrollStart;
+    private const double ColumnGap = 10;   // each column's right margin
+    private const double ScrollAnimMs = 220;
+
+    /// <summary>Ranks every game by the active multiworld's saved column order; games it doesn't list keep room order after them.</summary>
+    private void ApplyColumnOrder()
+    {
+        var order = App.Tracker.Active?.ColumnOrder ?? new List<string>();
+        foreach (var s in App.Tracker.Slots)
+        {
+            int i = order.IndexOf(s.Ref.Id);
+            s.ColumnRank = i >= 0 ? i : 100_000 + s.Index;
+        }
+    }
+
+    private List<SlotView> ColumnOrderNow() => _columnsView.Cast<SlotView>().ToList();
+
+    /// <summary>Moves a game's column to an insertion point (0 = first, Count = last) and remembers the order.
+    /// A locked game can't move in among the unlocked ones (or the other way round): they stay grouped.</summary>
+    private void MoveColumn(SlotView slot, int insertAt)
+    {
+        var mw = App.Tracker.Active;
+        var order = ColumnOrderNow();
+        int from = order.IndexOf(slot);
+        if (mw == null || from < 0) return;
+        if (insertAt > from) insertAt--;
+        insertAt = Math.Clamp(insertAt, 0, order.Count - 1);
+        if (insertAt == from) return;
+        order.RemoveAt(from);
+        order.Insert(insertAt, slot);
+        mw.ColumnOrder = order.Select(s => s.Ref.Id).ToList();
+        App.SaveConfig();
+        ApplyColumnOrder();
+    }
+
+    private void Column_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not SlotView s || App.Tracker.Slots.Count < 2) return;
+        _pressSlot = s;
+        _pressPoint = e.GetPosition(Columns);
+    }
+
+    private void Columns_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_pressSlot == null) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { _pressSlot = null; if (_dragging) EndColumnDrag(false); return; }
+        var p = e.GetPosition(Columns);
+        if (!_dragging)
+        {
+            if (Math.Abs(p.X - _pressPoint.X) < 8 && Math.Abs(p.Y - _pressPoint.Y) < 8) return;
+            _dragging = true;
+            Columns.CaptureMouse();
+            if (Columns.ItemContainerGenerator.ContainerFromItem(_pressSlot) is UIElement c) c.Opacity = 0.45;
+            Mouse.OverrideCursor = Cursors.SizeWE;
+            DropMarker.Height = Columns.ActualHeight;
+            DropMarker.Visibility = Visibility.Visible;
+            _dragScroll.Start();
+        }
+        UpdateDropMarker(p);
+        // Near the visible edges: keep scrolling while the pointer stays there
+        double x = e.GetPosition(OverviewScroll).X, edge = 60, w = OverviewScroll.ActualWidth;
+        _dragScrollSpeed = x < edge ? -(edge - x) / 3 : x > w - edge ? (x - (w - edge)) / 3 : 0;
+    }
+
+    private void UpdateDropMarker(Point p)
+    {
+        if (_pressSlot == null) return;
+        var order = ColumnOrderNow();
+        int n = order.Count;
+        if (n == 0) return;
+        double colW = Columns.ActualWidth / n;
+        int unlocked = order.Count(s => !s.Locked);
+        int lo = _pressSlot.Locked ? unlocked : 0, hi = _pressSlot.Locked ? n : unlocked;
+        _dropIndex = Math.Clamp((int)Math.Round(p.X / colW), lo, hi);
+        Canvas.SetLeft(DropMarker, Math.Clamp(_dropIndex * colW - ColumnGap / 2 - 1.5, 0, Math.Max(0, Columns.ActualWidth - ColumnGap - 3)));
+    }
+
+    private void DragAutoScroll()
+    {
+        if (!_dragging || _dragScrollSpeed == 0) return;
+        OverviewScroll.ScrollToHorizontalOffset(Math.Clamp(OverviewScroll.HorizontalOffset + _dragScrollSpeed, 0, OverviewScroll.ScrollableWidth));
+        UpdateDropMarker(Mouse.GetPosition(Columns));
+    }
+
+    private void Columns_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_dragging)
+        {
+            UpdateDropMarker(e.GetPosition(Columns));
+            EndColumnDrag(true);
+            e.Handled = true;   // not a click: don't focus the game
+        }
+        _pressSlot = null;
+    }
+
+    private void EndColumnDrag(bool commit)
+    {
+        var slot = _pressSlot;
+        _dragging = false;
+        _pressSlot = null;
+        _dragScroll.Stop();
+        _dragScrollSpeed = 0;
+        DropMarker.Visibility = Visibility.Collapsed;
+        Mouse.OverrideCursor = null;
+        if (slot != null && Columns.ItemContainerGenerator.ContainerFromItem(slot) is UIElement c) c.Opacity = 1;
+        if (Columns.IsMouseCaptured) Columns.ReleaseMouseCapture();
+        if (commit && slot != null) MoveColumn(slot, _dropIndex);
+    }
+
+    private void OverviewScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) => UpdateScrollArrows();
+
+    private void UpdateScrollArrows()
+    {
+        double off = OverviewScroll.HorizontalOffset, max = OverviewScroll.ScrollableWidth;
+        ScrollLeftBtn.Visibility = max > 1 && off > 1 ? Visibility.Visible : Visibility.Collapsed;
+        ScrollRightBtn.Visibility = max > 1 && off < max - 1 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Where to scroll so the next column that isn't fully visible on that side is (dir 1 = right, -1 = left).</summary>
+    private double ColumnScrollTarget(int dir)
+    {
+        int n = App.Tracker.Slots.Count;
+        double max = OverviewScroll.ScrollableWidth;
+        if (n == 0 || max <= 0) return 0;
+        double colW = Columns.ActualWidth / n, view = OverviewScroll.ViewportWidth;
+        double off = _scrollAnim.IsEnabled ? _scrollTo : OverviewScroll.HorizontalOffset;
+        if (dir > 0)
+        {
+            for (int k = 0; k < n; k++)
+            {
+                double right = (k + 1) * colW - ColumnGap;
+                if (right > off + view + 1) return k == n - 1 ? max : Math.Min(max, right - view);
+            }
+            return max;
+        }
+        for (int k = n - 1; k >= 0; k--)
+            if (k * colW < off - 1) return Math.Max(0, k * colW);
+        return 0;
+    }
+
+    private void ScrollLeft_Click(object sender, RoutedEventArgs e) => AnimateColumnsTo(ColumnScrollTarget(-1));
+    private void ScrollRight_Click(object sender, RoutedEventArgs e) => AnimateColumnsTo(ColumnScrollTarget(1));
+
+    private void AnimateColumnsTo(double target)
+    {
+        _scrollFrom = OverviewScroll.HorizontalOffset;
+        _scrollTo = target;
+        _scrollStart = DateTime.UtcNow;
+        if (!SystemParameters.ClientAreaAnimation) { OverviewScroll.ScrollToHorizontalOffset(target); return; }
+        _scrollAnim.Start();
+    }
+
+    private void StepScrollAnimation()
+    {
+        double t = Math.Min(1, (DateTime.UtcNow - _scrollStart).TotalMilliseconds / ScrollAnimMs);
+        double eased = 1 - Math.Pow(1 - t, 3);
+        OverviewScroll.ScrollToHorizontalOffset(_scrollFrom + (_scrollTo - _scrollFrom) * eased);
+        if (t >= 1) _scrollAnim.Stop();
+    }
+
     /// <summary>Columns share the width; with many games they keep a readable minimum and scroll sideways.</summary>
     private void UpdateColumnsWidth()
     {
@@ -165,6 +346,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         }
         Columns.Width = Math.Max(avail, n * 270);
         Columns.Height = Math.Max(0, OverviewScroll.ActualHeight - (Columns.Width > avail + 1 ? 12 : 0));
+        Dispatcher.InvokeAsync(UpdateScrollArrows, DispatcherPriority.Loaded);
     }
 
     private void SyncTileChecks()
@@ -1272,6 +1454,46 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         SelfTestOverviewGlitched();
         SelfTestSlotLock();
         App.Tracker.SetFocus(null);
+        UpdateLayout();
+        SelfTestColumns();
+    }
+
+    /// <summary>Self-test: dragging a column moves it and is remembered; locked games stay after unlocked ones;
+    /// the scroll arrows aim at whole columns.</summary>
+    private void SelfTestColumns()
+    {
+        var mw = App.Tracker.Active ?? throw new InvalidOperationException("Self-test expected an active multiworld.");
+        var saved = mw.ColumnOrder.ToList();
+        var order = ColumnOrderNow();
+        if (order.Count < 3) return;
+        var first = order[0];
+        MoveColumn(first, 2);   // drop it between the 2nd and 3rd column
+        var now = ColumnOrderNow();
+        if (now[1] != first || now[0] != order[1])
+            throw new InvalidOperationException("Dragging a column didn't move it.");
+        if (mw.ColumnOrder.FirstOrDefault() != order[1].Ref.Id)
+            throw new InvalidOperationException("The column order wasn't remembered.");
+        MoveColumn(first, 0);
+        if (ColumnOrderNow()[0] != first) throw new InvalidOperationException("Dragging a column back didn't move it.");
+
+        Columns.Width = Math.Max(OverviewScroll.ActualWidth, 0) + 3 * 270;   // force sideways scrolling
+        UpdateLayout();
+        if (OverviewScroll.ScrollableWidth > 1)
+        {
+            OverviewScroll.ScrollToHorizontalOffset(0);
+            UpdateLayout();
+            double right = ColumnScrollTarget(1);
+            if (right <= 0 || right > OverviewScroll.ScrollableWidth + 0.5)
+                throw new InvalidOperationException($"Right arrow aims at {right:0} (scrollable {OverviewScroll.ScrollableWidth:0}).");
+            OverviewScroll.ScrollToHorizontalOffset(OverviewScroll.ScrollableWidth);
+            UpdateLayout();
+            if (ColumnScrollTarget(-1) >= OverviewScroll.HorizontalOffset)
+                throw new InvalidOperationException("Left arrow doesn't scroll left.");
+            OverviewScroll.ScrollToHorizontalOffset(0);
+        }
+        mw.ColumnOrder = saved;
+        ApplyColumnOrder();
+        UpdateColumnsWidth();
         UpdateLayout();
     }
 

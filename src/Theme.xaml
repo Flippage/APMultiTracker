@@ -48,6 +48,8 @@
     <Geometry x:Key="IconTitles">M4,6 L20,6 M4,12 L13,12 M4,18 L10,18 M16,12 L20,12 L20,20 L16,20 Z</Geometry>
     <Geometry x:Key="IconGear">M12,9 A3,3 0 1 1 11.99,9 Z M12,2 L12,5 M12,19 L12,22 M2,12 L5,12 M19,12 L22,12 M4.9,4.9 L7,7 M17,17 L19.1,19.1 M4.9,19.1 L7,17 M17,7 L19.1,4.9</Geometry>
     <Geometry x:Key="IconDownload">M12,3 L12,15 M7,10 L12,15 L17,10 M4,19 L20,19</Geometry>
+    <Geometry x:Key="IconChevronLeft">M15,5 L8,12 L15,19</Geometry>
+    <Geometry x:Key="IconChevronRight">M9,5 L16,12 L9,19</Geometry>
     <Geometry x:Key="IconCheck">M20,6 L9,17 L4,12</Geometry>
     <Geometry x:Key="IconPencil">M4,20 L4,16 L16,4 L20,8 L8,20 Z M13,7 L17,11</Geometry>
     <Geometry x:Key="IconUser">M12,4 A4,4 0 1 1 11.99,4 Z M4,21 C4,16.5 7.5,14 12,14 C16.5,14 20,16.5 20,21</Geometry>

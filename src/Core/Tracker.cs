@@ -124,6 +124,9 @@ public sealed class SlotView : INotifyPropertyChanged
 {
     public SlotRef Ref { get; }
     public int Index { get; set; }
+    private int _columnRank;
+    /// <summary>Position in the All games columns (the user's drag order, then room order); locked games still go last.</summary>
+    public int ColumnRank { get => _columnRank; set { if (_columnRank != value) { _columnRank = value; Notify(nameof(ColumnRank)); } } }
 
     public SlotView(SlotRef slot)
     {

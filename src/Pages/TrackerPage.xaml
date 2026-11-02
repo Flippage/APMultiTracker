@@ -3,6 +3,36 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:APMultiTracker">
     <UserControl.Resources>
+        <!-- Round arrow over the All games columns' left/right edge -->
+        <Style x:Key="ColumnArrow" TargetType="Button">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#F0202020" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="19">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.6" Color="Black"/>
+                            </Border.Effect>
+                            <Viewbox Width="16" Height="16">
+                                <Path Style="{StaticResource Icon}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"/>
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F02C2C2C"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <BooleanToVisibilityConverter x:Key="Vis"/>
 
         <!-- Collapsible region groups (click a header; Ctrl+click for all) -->
@@ -346,7 +376,10 @@
                       FontSize="12.5" Margin="0,0,18,0" Checked="OverviewGlitched_Changed" Unchecked="OverviewGlitched_Changed"/>
             <TextBlock Text="IN LOGIC NOW" Style="{StaticResource Caps}" VerticalAlignment="Center"/>
         </DockPanel>
-        <ScrollViewer x:Name="OverviewScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <Grid>
+        <ScrollViewer x:Name="OverviewScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      ScrollChanged="OverviewScroll_ScrollChanged">
+            <Grid>
             <ItemsControl x:Name="Columns" Focusable="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -358,7 +391,7 @@
                         <Border Background="{StaticResource CardBrush}" CornerRadius="12" Margin="0,0,10,0" Padding="12,12,6,8">
                             <DockPanel>
                                 <Border DockPanel.Dock="Top" Cursor="Hand" Background="Transparent" MouseLeftButtonUp="Column_Click"
-                                        ToolTip="Focus this game">
+                                        PreviewMouseLeftButtonDown="Column_MouseDown" ToolTip="Click to focus this game, drag to move it">
                                     <DockPanel Margin="0,0,6,10">
                                         <Border Width="30" Height="40" CornerRadius="4" local:Art.Url="{Binding ArtUrl}" DockPanel.Dock="Left"/>
                                         <Grid DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip="{Binding ToDoTip}">
@@ -454,7 +487,18 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- Where a dragged column will land -->
+            <Canvas IsHitTestVisible="False">
+                <Border x:Name="DropMarker" Width="3" CornerRadius="1.5" Background="{StaticResource AccentBrush}" Visibility="Collapsed"/>
+            </Canvas>
+            </Grid>
         </ScrollViewer>
+        <!-- Scroll a whole column into view -->
+        <Button x:Name="ScrollLeftBtn" Style="{StaticResource ColumnArrow}" Tag="{StaticResource IconChevronLeft}" HorizontalAlignment="Left"
+                Margin="6,0,0,0" Click="ScrollLeft_Click" ToolTip="Previous game" Visibility="Collapsed"/>
+        <Button x:Name="ScrollRightBtn" Style="{StaticResource ColumnArrow}" Tag="{StaticResource IconChevronRight}" HorizontalAlignment="Right"
+                Margin="0,0,16,0" Click="ScrollRight_Click" ToolTip="Next game" Visibility="Collapsed"/>
+        </Grid>
         </DockPanel>
 
         <!-- ===================== One game ===================== -->
