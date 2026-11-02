@@ -26,6 +26,12 @@
   also shows up when you've only seen a Pokémon, say in a trainer battle, and wild Pokémon can be randomized), so with
   dexsanity on they show a grey **?** (hover for why). They're still listed in the game's list and its All games
   column, so you can see what you haven't caught yet, but they no longer count toward the number in logic.
+- **Random YAML options use the room's values** (engine v0.4.15): for games without Universal Tracker support, any
+  option the room shares (most games share their settings) is taken from the room instead of being rolled again
+  from the YAML, so an option left to chance in a YAML matches the real game. Pokémon Emerald's **free fly town**
+  (picked at random while generating) comes from the room too, so the logic no longer flies you somewhere else.
+- The engine is reinstalled whenever the app's copy differs from the one in Archipelago, not only when its version
+  number goes up.
 
 ## v0.11.4
 

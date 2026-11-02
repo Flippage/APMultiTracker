@@ -41,7 +41,27 @@ public sealed class EngineHost
     public string? UtVersion { get; private set; }
     public string? InstalledEngineVersion { get; private set; }
     public static string BundledEngineVersion { get; } = ReadBundledVersion();
-    public bool EngineOutdated => InstalledEngineVersion != null && Compare(InstalledEngineVersion, BundledEngineVersion) < 0;
+    /// <summary>The installed engine is older, or the same version but not the same file (a test build changed the engine
+    /// without a new version number): either way, install the bundled one. Never downgrades.</summary>
+    public bool EngineOutdated => InstalledEngineVersion != null
+        && (Compare(InstalledEngineVersion, BundledEngineVersion) < 0
+            || (Compare(InstalledEngineVersion, BundledEngineVersion) == 0 && _installedHash != null && _installedHash != BundledHash.Value));
+    private string? _installedHash;
+    private static readonly Lazy<string?> BundledHash = new(() =>
+    {
+        using var s = typeof(EngineHost).Assembly.GetManifestResourceStream(EngineFile);
+        return s == null ? null : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(s));
+    });
+
+    private static string? HashFile(string path)
+    {
+        try
+        {
+            using var f = File.OpenRead(path);
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(f));
+        }
+        catch { return null; }
+    }
 
     public event Action? Changed;
     /// <summary>Raised (UI thread) each time a connection to the engine is established.</summary>
@@ -70,6 +90,7 @@ public sealed class EngineHost
         ApVersion = ApDir == null ? "" : ReadApVersion(ApDir);
         UtVersion = ApDir == null ? null : FindTracker(ApDir);
         InstalledEngineVersion = ApDir == null ? null : FindInstalledEngine(ApDir);
+        _installedHash = ApDir == null || InstalledEngineVersion == null ? null : HashFile(Path.Combine(ApDir, "custom_worlds", EngineFile));
         if (Client.IsConnected) { Changed?.Invoke(); return; }
         if (ApDir == null) Set(EngineState.NoArchipelago, "Archipelago wasn't found. Choose its folder in Settings.");
         else if (UtVersion == null) Set(EngineState.NoTracker, "Universal Tracker isn't installed in Archipelago.");

@@ -133,14 +133,72 @@ SLOT_DATA_OPTIONS: dict[str, Callable[[dict], dict]] = {
 
 
 def slot_data_options(game: str, slot_data: dict) -> dict:
+    """YAML options to set from the room's slot data instead of re-rolling them from the YAML.
+
+    For apworlds without Universal Tracker support (no interpret_slot_data), every slot data entry named like one of
+    the game's options is taken as that option's value: an option left to chance in the YAML (random, weights) would
+    otherwise be rolled again and could differ from the room. Worlds with UT support restore their own data, so only
+    the hand-written fixes in SLOT_DATA_OPTIONS apply to them."""
+    if not isinstance(slot_data, dict):
+        return {}
+    out: dict = {}
+    world_cls = AutoWorld.AutoWorldRegister.world_types.get(game)
+    if world_cls is not None and not hasattr(world_cls, "interpret_slot_data"):
+        try:
+            hints = dict(world_cls.options_dataclass.type_hints)
+        except Exception:
+            hints = {}
+        for key, value in slot_data.items():
+            option = hints.get(key)
+            # Dicts are left out: in a YAML they read as random weights. Each value must be one the option takes
+            # (some worlds reuse an option's name for other data, e.g. Emerald's hm_requirements table).
+            if option is None or key in GENERIC_OPTION_SKIP or not isinstance(value, (bool, int, float, str, list)):
+                continue
+            try:
+                option.from_any(value)
+            except Exception:
+                continue
+            out[key] = value
     fn = SLOT_DATA_OPTIONS.get(game)
-    if fn is None or not isinstance(slot_data, dict):
-        return {}
-    try:
-        return fn(slot_data)
-    except Exception:
-        log.warning(f"Couldn't read {game}'s options from its slot data", exc_info=True)
-        return {}
+    if fn is not None:
+        try:
+            out.update(fn(slot_data))
+        except Exception:
+            log.warning(f"Couldn't read {game}'s options from its slot data", exc_info=True)
+    return out
+
+
+# Never copied from slot data: not game settings, or not meaningful in a YAML.
+GENERIC_OPTION_SKIP = {"plando_items", "plando_texts", "plando_connections", "item_links", "start_inventory",
+                       "start_inventory_from_pool", "start_hints", "start_location_hints", "local_items",
+                       "non_local_items", "exclude_locations", "priority_locations", "progression_balancing"}
+
+
+def _emerald_free_fly(world, core, slot_data: dict) -> None:
+    """Pokémon Emerald picks its free fly town at random while generating (it isn't an option): put the room's town
+    (slot data free_fly_location_id) on the FREE_FLY_LOCATION event instead of the rebuild's own pick."""
+    target = slot_data.get("free_fly_location_id")
+    if not isinstance(target, int) or getattr(world, "free_fly_location_id", None) == target:
+        return
+    import importlib
+    package = type(world).__module__
+    import sys
+    if not hasattr(sys.modules.get(package), "__path__"):
+        package = package.rsplit(".", 1)[0]
+    ids = importlib.import_module(f"{package}.locations").VISITED_EVENT_NAME_TO_ID
+    name = next((n for n, i in ids.items() if i == target), None)
+    if name is None:
+        return
+    loc = core.multiworld.get_location("FREE_FLY_LOCATION", core.player_id)
+    loc.item = None
+    loc.place_locked_item(world.create_event(name))
+    world.free_fly_location_id = target
+
+
+# Per game: values the rebuild picks at random during generation (not options) that the room shares in slot data.
+POST_BUILD_FIXES: dict[str, Callable] = {
+    "Pokemon Emerald": _emerald_free_fly,
+}
 
 
 # Pokédex checks (dexsanity) can't be judged by the logic: a Pokédex entry also appears when you only *see* a
@@ -376,9 +434,16 @@ class SlotContext(CommonContext):
                 patches[slot_name.casefold()] = (game, fixed)
             for name, (g, opts) in patches.items():
                 # Names only: the values can be spoilers (e.g. a game still locked by SlotLock), and the log is easy to open.
-                log.info(f"{slot_name}: using the room's {', '.join(sorted(opts))} for {name} ({g}) instead of the YAML's")
+                log.info(f"{slot_name}: using the room's values for {len(opts)} of {name}'s options ({g}) instead of the YAML's")
             if patches:
                 shared = self.engine.patched_yaml_world(self.yaml_folder, slot_name, patches, only_own=False)
+                if shared.launch_multiworld is None:
+                    # A value the YAML can't take as written (an unusual option type): fall back to the YAMLs as they are
+                    plain = self.engine.yaml_world(self.yaml_folder)
+                    if plain.launch_multiworld is not None:
+                        log.warning(f"{slot_name}: the YAMLs didn't load with the room's values "
+                                    f"({last_line(shared.gen_error)}); using them as they are")
+                        shared = plain
             else:
                 shared = self.engine.yaml_world(self.yaml_folder)
             if shared.launch_multiworld is None:
@@ -424,6 +489,12 @@ class SlotContext(CommonContext):
             else:
                 raise EngineError(f"Universal Tracker couldn't rebuild {game}'s logic: "
                                   f"{last_line(core.gen_error) or 'unknown error'}")
+        fix = POST_BUILD_FIXES.get(game)
+        if fix is not None and core.multiworld is not None and core.player_id is not None:
+            try:
+                fix(core.get_current_world(), core, slot_data)
+            except Exception:
+                log.warning(f"{slot_name}: couldn't apply the room's values to {game}'s rebuild", exc_info=True)
         if getattr(core, "tracker_disabled", False):   # not in Universal Tracker before 0.2.34
             raise EngineError(core.gen_error or f"Universal Tracker can't track {game} with these options.")
         if core.multiworld is None or core.player_id is None:
