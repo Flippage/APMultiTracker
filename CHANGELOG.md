@@ -13,6 +13,9 @@
   - **CrossCode**: the area, and the floor in dungeons (e.g. Temple Mine U1). Area data from lurch9229's CrossCode
     PopTracker pack (MIT licence), with thanks.
 
+  - **Any game whose apworld has a Universal Tracker map with auto-tabbing** (e.g. Donkey Kong 64, once you've picked
+    its PopTracker pack for Universal Tracker): the map Universal Tracker would switch to, with the checks on it.
+
   Other games don't report where the player is (or not in a way the tracker can use yet), so they're unchanged.
 
 ## v0.11.4

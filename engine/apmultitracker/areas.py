@@ -194,6 +194,108 @@ class _CrossCode(AreaWatcher):
         return self._set(area, in_area)
 
 
+# ---------------------------------------------------------------------------------------------- Universal Tracker maps
+# Any apworld that ships a map tracker for Universal Tracker with auto-tabbing (a `tracker_world` with
+# `map_page_setting_key` / `map_page_index`, e.g. Donkey Kong 64): the watched value picks a map, and the pack's
+# locations.json says which checks are on it. Same data UT uses to switch its own map tab.
+
+def _load_pack_json(read: Callable[[str], bytes], path: str):
+    import json
+    import re
+    text = read(path).decode("utf-8-sig")
+    try:
+        return json.loads(text)
+    except ValueError:   # PopTracker allows comments and trailing commas
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"(?m)^\s*//.*$", "", text)
+        text = re.sub(r",(\s*[}\]])", r"\1", text)
+        return json.loads(text)
+
+
+class _UTMap(AreaWatcher):
+    def __init__(self, world_cls, core, team: int, slot: int):
+        tw = getattr(world_cls, "tracker_world", None)
+        index = tw.get("map_page_index") if isinstance(tw, dict) else None
+        if not callable(index):
+            raise LookupError("no UT map auto-tabbing")
+        read = self._reader(world_cls, core, tw)
+        key = tw.get("map_page_setting_key") or f"{{player}}_{{team}}_UT_MAP"
+        super().__init__([key.format(player=slot, team=team)])
+        self.index = index
+
+        def files(entry) -> list[str]:
+            v = tw.get(entry) or []
+            return [v] if isinstance(v, str) else list(v)
+
+        self.maps: list[str] = []
+        for f in files("map_page_maps"):
+            self.maps += [m.get("name", "") for m in _load_pack_json(read, f)]
+        present = _present(core)
+        by_id = {v: k for k, v in present.items()}
+        mapping = tw.get("poptracker_name_mapping") or {}
+        self.by_map: dict[str, set[int]] = collections.defaultdict(set)
+        todo = []
+        for f in files("map_page_locations"):
+            todo += _load_pack_json(read, f)
+        while todo:
+            node = todo.pop()
+            todo += node.get("children", []) or []
+            maps = [m.get("map") for m in node.get("map_locations", []) or []]
+            if not maps:
+                continue
+            for section in node.get("sections", []) or []:
+                name = section.get("name")
+                target = mapping.get(f"{node.get('name', '')}/{name}", name)
+                lid = target if isinstance(target, int) and target in by_id else present.get(target)
+                if lid is not None:
+                    for m in maps:
+                        self.by_map[m].add(lid)
+        # A map showing (nearly) every check is an overview, not a place
+        total = max(1, len(present))
+        self.overview = {m for m, ids in self.by_map.items() if len(ids) >= 0.8 * total and total > 20}
+
+    @staticmethod
+    def _reader(world_cls, core, tw: dict) -> Callable[[str], bytes]:
+        """Reads a file of the pack: inside the apworld (map_page_folder), or the external pack zip the player chose
+        for Universal Tracker (external_pack_key in host.yaml). Never asks for one."""
+        import os
+        import pkgutil
+        import zipfile
+        external = tw.get("external_pack_key")
+        if external:
+            ref = core.get_current_world().settings[external]
+            ref = str(ref) if ref else ""
+            if not ref or not zipfile.is_zipfile(ref):
+                raise LookupError(f"no PopTracker pack chosen for Universal Tracker ({external} in host.yaml)")
+            prefix = os.path.splitext(os.path.basename(ref))[0] + "/" if tw.get("nested_pack") else ""
+
+            def read_zip(path: str) -> bytes:
+                with zipfile.ZipFile(ref) as z:
+                    return z.read(prefix + path)
+            return read_zip
+        folder = tw.get("map_page_folder")
+        if not folder:
+            raise LookupError("no map pack")
+
+        def read_module(path: str) -> bytes:
+            data = pkgutil.get_data(world_cls.__module__, f"/{folder}/{path}")
+            if data is None:
+                raise FileNotFoundError(path)
+            return data
+        return read_module
+
+    def on_value(self, key: str, value: Any) -> bool:
+        try:
+            i = int(self.index(value if value is not None else ""))
+        except Exception:
+            return self._set("", ())
+        if i < 0 or i >= len(self.maps) or not self.maps[i] or self.maps[i] in self.overview:
+            return self._set("", ())
+        name = self.maps[i]
+        label = name.replace("_", " ").replace("-", " ")
+        return self._set(label.title() if label.islower() else label, self.by_map.get(name, ()))
+
+
 ADAPTERS: dict[str, Callable[..., AreaWatcher]] = {
     "Pokemon Emerald": _Emerald,
     "The Minish Cap": _MinishCap,
@@ -205,11 +307,19 @@ ADAPTERS: dict[str, Callable[..., AreaWatcher]] = {
 
 def make(game: str, world_cls, core, team: int, slot: int) -> Optional[AreaWatcher]:
     """Worker thread. The game's area watcher, or None if it has none (or its apworld isn't laid out as expected)."""
+    if core is None or core.multiworld is None:
+        return None
     factory = ADAPTERS.get(game)
-    if factory is None or core is None or core.multiworld is None:
-        return None
-    try:
-        return factory(world_cls, core, team, slot)
-    except Exception:
-        log.warning(f"Current area isn't available for {game} (its apworld isn't laid out as expected)", exc_info=True)
-        return None
+    if factory is not None:
+        try:
+            return factory(world_cls, core, team, slot)
+        except Exception:
+            log.warning(f"Current area isn't available for {game} (its apworld isn't laid out as expected)", exc_info=True)
+    # Otherwise (or if that failed): Universal Tracker's map auto-tabbing, if the apworld has it
+    tw = getattr(world_cls, "tracker_world", None)
+    if isinstance(tw, dict) and callable(tw.get("map_page_index")):
+        try:
+            return _UTMap(world_cls, core, team, slot)
+        except Exception:
+            log.warning(f"Current area isn't available for {game} (couldn't read its Universal Tracker map pack)", exc_info=True)
+    return None
