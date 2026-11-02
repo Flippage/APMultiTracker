@@ -32,8 +32,8 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public bool IsUncertain => Status == "uncertain";
     /// <summary>Why the logic is unknown (uncertain checks), or what an extra row is.</summary>
     public string? Note { get; init; }
-    /// <summary>Not a check, e.g. a wild encounter spot (Pokémon Emerald): listed with logic colours and hideable,
-    /// but never counted and not in the All games columns.</summary>
+    /// <summary>Not an Archipelago location, e.g. a wild encounter (Pokémon Emerald), but listed and counted like a
+    /// check; hiding it is how it's ticked off.</summary>
     public bool Extra { get; init; }
     /// <summary>A reachable entrance whose destination isn't known yet (entrance randomizers), like UT's unconnected lines.</summary>
     public bool IsEntrance => Status == "entrance";
@@ -270,11 +270,11 @@ public sealed class SlotView : INotifyPropertyChanged
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
         // Uncertain checks (logic unknown) stay visible: they may or may not be reachable
-        var shown = locs.Where(l => !l.Extra && (l.Status is "in_logic" or "entrance" or "uncertain" || (l.IsGlitched && App.Config.OverviewShowGlitched))
+        var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" or "uncertain" || (l.IsGlitched && App.Config.OverviewShowGlitched))
                                     && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
-                : shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
+                : shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.Extra && !l.Here ? 1 : 0).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance))
             .ToList();
     }
 
@@ -436,13 +436,13 @@ public sealed class SlotView : INotifyPropertyChanged
         }
         if (!HasArea) here.Clear();
         if (here.Count > 0) locs = locs.Select(l => here.Contains(l.Id) ? l with { HereArea = AreaName } : l).ToList();
-        HereCount = locs.Count(l => l.Here && !l.IsHidden && !l.IsEntrance && !l.Extra);
-        HereInLogic = locs.Count(l => l.Here && l.IsInLogic && !l.Excluded && !l.Extra);
-        HereGlitched = locs.Count(l => l.Here && l.IsGlitched && !l.Excluded && !l.Extra);
+        HereCount = locs.Count(l => l.Here && !l.IsHidden && !l.IsEntrance);
+        HereInLogic = locs.Count(l => l.Here && l.IsInLogic && !l.Excluded);
+        HereGlitched = locs.Count(l => l.Here && l.IsGlitched && !l.Excluded);
         Entrances = locs.Count(l => l.IsEntrance);
         // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
-        InLogic = locs.Count(l => l.IsInLogic && !l.Excluded && !l.Extra);
-        Glitched = locs.Count(l => l.IsGlitched && !l.Excluded && !l.Extra);
+        InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);
+        Glitched = locs.Count(l => l.IsGlitched && !l.Excluded);
         Locations = locs;
 
         var items = new List<ItemCount>();

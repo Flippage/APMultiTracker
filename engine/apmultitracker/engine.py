@@ -195,47 +195,78 @@ def _emerald_free_fly(world, core, slot_data: dict) -> None:
     world.free_fly_location_id = target
 
 
+# Pokémon Emerald's encounter slot rates (%), per encounter type; fishing slots by rod.
+_EMERALD_RATES = {
+    "LAND": [20, 20, 10, 10, 10, 10, 5, 5, 4, 4, 1, 1],
+    "WATER": [60, 30, 5, 4, 1],
+    "FISHING": [70, 30, 60, 20, 20, 40, 40, 15, 4, 1],
+}
+_EMERALD_RODS = [("Old Rod", range(0, 2)), ("Good Rod", range(2, 5)), ("Super Rod", range(5, 10))]
+
+
+def _rate(value: float) -> str:
+    return f"{value:.0f}%" if abs(value - round(value)) < 0.05 else f"{value:.1f}%"
+
+
 def _emerald_wild_encounters(world, core) -> list[dict]:
-    """Pokémon Emerald's wild encounter spots, like the Emerald PopTracker pack's encounter locations: one row per map
-    and method (grass/caves, surfing, each rod). Which Pokémon live there is randomized and not shared with trackers,
-    but whether you can get there with the right gear is real logic: the apworld's per-map encounter regions."""
+    """Pokémon Emerald's wild encounters, like the Emerald PopTracker pack's encounter locations: one row per
+    encounter on each map and method (grass & caves, surfing, each rod), with its chance. The randomizer swaps each
+    vanilla species for another throughout a table, so the vanilla table says which slots share a Pokémon and how
+    likely it is (equal slots with normalized encounter rates). Which Pokémon it is isn't shared with trackers, but
+    whether you can get there with what it takes is real logic: the apworld's per-map encounter regions."""
     import re
     import zlib
     from .areas import _sub
     data = _sub(type(world), "data").data
-    rows: dict[str, dict] = {}
+    normalized = bool(getattr(getattr(getattr(world, "options", None), "normalize_encounter_rates", None), "value", 0))
+    rows: list[dict] = []
     for region in core.multiworld.regions:
         if region.player != core.player_id:
             continue
         m = re.match(r"^(MAP_.+)_(LAND|WATER|FISHING)_ENCOUNTERS$", region.name)
-        if not m:
+        if not m or m.group(1) not in data.maps:
             continue
         map_name, kind = m.groups()
-        label = data.maps[map_name].label if map_name in data.maps else map_name
-        for loc in region.locations:
-            if kind == "LAND":
-                method = "Grass & caves"
-            elif kind == "WATER":
-                method = "Surfing"
-            else:
-                rod = next((r for r in ("OLD_ROD", "GOOD_ROD", "SUPER_ROD") if f"_{r}_" in loc.name), "")
-                method = rod.replace("_", " ").title() if rod else "Fishing"
-            key = f"{map_name}/{method}"
-            row = rows.get(key)
-            if row is None:
-                row = rows[key] = {
+        label = data.maps[map_name].label
+        table = (data.maps[map_name].encounters or {}).get(kind)   # keyed by PokemonSource, a str enum
+        slots = list(getattr(table, "slots", []) or [])
+        rates = _EMERALD_RATES[kind]
+        groups = ([("Grass & caves" if kind == "LAND" else "Surfing", range(len(rates)))] if kind != "FISHING"
+                  else _EMERALD_RODS)
+        for method, slot_range in groups:
+            idx = [i for i in slot_range if i < len(slots)]
+            if not idx:
+                continue
+            # The locations that stand for this method (fishing: the rod's own, with its rule)
+            locs = [loc for loc in region.locations
+                    if kind != "FISHING" or f"_{method.replace(' ', '_').upper()}_" in loc.name]
+            if not locs:
+                continue
+            # One row per vanilla species, in slot order, with its combined chance
+            order, chance = [], {}
+            for i in idx:
+                species = slots[i]
+                if species not in chance:
+                    order.append(species)
+                    chance[species] = 0.0
+                chance[species] += 100 / len(idx) if normalized else rates[i]
+            for n, species in enumerate(order, 1):
+                key = f"{map_name}/{method}/{n}"
+                rows.append({
                     "id": -(10 ** 12) - zlib.crc32(key.encode()),   # stable, apart from real and entrance ids
-                    "name": f"{label} · {method}", "key": region.name, "group": "Wild encounters", "map": map_name,
-                    "note": (f"Wild Pokémon by {method.lower()} on {label}. Which Pokémon live here is randomized and "
-                             f"not shared with trackers; this shows whether you can get here with what it takes. "
-                             f"Hide it once you've caught what's here."),
-                    "locations": [],
-                }
-            row["locations"].append(loc)
-    return sorted(rows.values(), key=lambda r: r["name"])
+                    "name": f"{label} · {method} encounter {n}, {_rate(chance[species])}",
+                    "key": region.name, "group": "Wild encounters", "map": map_name,
+                    "note": (f"A wild Pokémon found by {method.lower()} on {label} ({_rate(chance[species])} of "
+                             f"encounters there). Which Pokémon it is is randomized and not shared with trackers; "
+                             f"this shows whether you can get here with what it takes. Hide it once you've caught it."),
+                    "locations": locs,
+                    "order": (label, ["Grass & caves", "Surfing", "Old Rod", "Good Rod", "Super Rod"].index(method), n),
+                })
+    return sorted(rows, key=lambda r: r["order"])
 
 
-# Per game: rows to list that aren't checks (no location id; hideable; never counted).
+# Per game: extra rows that aren't Archipelago locations (no location id) but are listed and counted like checks:
+# logic colours, hideable (that's how they're ticked off), part of the counts and the All games columns.
 EXTRA_ROWS: dict[str, Callable] = {
     "Pokemon Emerald": _emerald_wild_encounters,
 }
@@ -779,7 +810,7 @@ class SlotContext(CommonContext):
                 "hint": inputs["hint_text"].get(loc_id),
             })
 
-        # Extra rows that aren't checks (e.g. Emerald's wild encounter spots): logic colours, hideable, never counted
+        # Extra rows that aren't Archipelago locations (e.g. Emerald's wild encounters): listed and counted like checks
         extras = []
         for e in self.extra_rows:
             if e["id"] in core.ignored_locations:
@@ -841,7 +872,7 @@ class SlotContext(CommonContext):
             "seed": self.persist_id,
             "checked": inputs["checked"],
             "total": inputs["total"],
-            "in_logic": sum(1 for loc in locations if loc["status"] == "in_logic"),
+            "in_logic": sum(1 for loc in locations + extras if loc["status"] == "in_logic"),
             "glitched": sum(1 for loc in locations if loc["status"] == "glitched"),
             "hinted": sum(1 for loc in locations if loc["hint"] and loc["status"] != "ignored"),
             "ignored": len(core.ignored_locations & inputs["missing"]),

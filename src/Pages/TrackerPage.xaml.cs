@@ -531,7 +531,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
                                      || (l.Hint?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
         var sorted = App.Config.GroupByRegion
             ? items.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
-            : items.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.Extra ? 1 : 0).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance);
+            : items.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.Extra && !l.Here ? 1 : 0).ThenBy(l => l.HasHint ? 0 : 1).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance);
         ListSync.Sync(_checks, sorted.ToList());
         // Group containers can be reused for other regions as the list changes: re-apply collapsed state.
         Dispatcher.BeginInvoke(new Action(() => { foreach (var g in FindGroupItems(CheckListBox)) ApplyGroupState(g); }),
@@ -1649,16 +1649,16 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         // Checks whose logic is unknown: listed (with the reason) but never counted as in logic
         var unsure = App.Tracker.Slots.First(s => s.Locations.Any(l => l.IsUncertain));
         var q = unsure.Locations.First(l => l.IsUncertain);
-        if (unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded && !l.Extra) || q.IsInLogic || string.IsNullOrEmpty(q.Note)
+        if (unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded) || q.IsInLogic || string.IsNullOrEmpty(q.Note)
             || !unsure.Overview.Contains(q))
             throw new InvalidOperationException("An uncertain check is counted as in logic, has no reason, or is missing from its column.");
 
-        // Rows that aren't checks (wild encounter spots): listed under their own heading, never counted, not in columns
+        // Extra rows (wild encounters): under their own heading, counted like checks, in the column when in logic
         var extra = unsure.Locations.FirstOrDefault(l => l.Extra)
                     ?? throw new InvalidOperationException("The demo has no extra row.");
-        if (!extra.IsInLogic || unsure.Overview.Contains(extra) || extra.GroupKey != "🌿 Wild encounters"
-            || unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded && !l.Extra))
-            throw new InvalidOperationException("An extra row is counted, in a column, or not under its heading.");
+        if (!extra.IsInLogic || !unsure.Overview.Contains(extra) || extra.GroupKey != "🌿 Wild encounters"
+            || unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded))
+            throw new InvalidOperationException("An extra row isn't counted, isn't in its column, or isn't under its heading.");
     }
 
     /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>

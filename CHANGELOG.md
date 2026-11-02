@@ -32,11 +32,12 @@
   (picked at random while generating) comes from the room too, so the logic no longer flies you somewhere else.
 - The engine is reinstalled whenever the app's copy differs from the one in Archipelago, not only when its version
   number goes up.
-- **Pokémon Emerald: Wild encounters** (with dexsanity on, like the Emerald PopTracker pack's encounter spots): a
-  **🌿 Wild encounters** group lists every map's encounter spots by method (grass & caves, surfing, Old / Good / Super
-  Rod), coloured by whether you can get there with what it takes. Which Pokémon live there is randomized and not shared
-  with trackers, so hide a spot (eye button) once you've caught what's there. They aren't checks: they don't count
-  toward any number and aren't in the All games columns. Your current area lists its own spots too.
+- **Pokémon Emerald: Wild encounters** (with dexsanity on, like the Emerald PopTracker pack's encounter locations): a
+  **🌿 Wild encounters** group lists every encounter on each map by method, with its chance: "Route 104 · Old Rod
+  encounter 1, 70%" (grass & caves, surfing, Old / Good / Super Rod; equal chances with normalized encounter rates).
+  Each is coloured by whether you can get there with what it takes, and counts like a check: in the number in logic,
+  the All games column and your current area, where the ones on your map go to the top. Which Pokémon it is is
+  randomized and not shared with trackers, so hide it (eye button) once you've caught it.
 
 ## v0.11.4
 
