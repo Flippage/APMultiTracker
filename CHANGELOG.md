@@ -22,6 +22,11 @@
   tracker doesn't know, or its apworld has changed (with a link to raise an issue).
 
   Other games don't report where the player is (or not in a way the tracker can use yet), so they're unchanged.
+- **Pokédex checks with randomized wild Pokémon** (Pokémon Emerald, Pokémon Red and Blue): with dexsanity on and wild
+  Pokémon randomized, the room doesn't share where each Pokémon lives, so the tracker's rebuild (like Universal
+  Tracker's) rolls its own and its Pokédex logic was wrong. Those checks now show a grey **?** (hover for why), are
+  still listed in the game's list and its All games column, and no longer count toward the number in logic. With
+  wild Pokémon vanilla they're shown as usual.
 
 ## v0.11.4
 

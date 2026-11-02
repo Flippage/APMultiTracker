@@ -103,6 +103,9 @@ public static class Demo
                     ["region"] = g.Regions[i % g.Regions.Length], ["status"] = "out_of_logic", ["excluded"] = false, ["hint"] = null,
                 });
             locs.Add(new JsonObject { ["id"] = 9000, ["name"] = "Hidden example", ["region"] = g.Regions[0], ["status"] = "ignored", ["excluded"] = false, ["hint"] = null });
+            // A check whose logic can't be known (like Pokédex checks with randomized wild Pokémon)
+            if (g.Id == "d3")
+                locs.Add(new JsonObject { ["id"] = 9100, ["name"] = "Pokedex - Example", ["region"] = g.Regions[0], ["status"] = "uncertain", ["excluded"] = false, ["hint"] = null });
             var items = new JsonArray();
             foreach (var it in new[] { "Progressive Sword", "Bombs", "Hookshot", "Bottle", "Rupees (50)", "Heart Container" })
                 items.Add(new JsonObject { ["name"] = it, ["count"] = rng.Next(1, 4), ["prog"] = it.Length < 9 });
@@ -136,6 +139,7 @@ public static class Demo
                 ["go_mode"] = g.Id == "d4" ? "yes" : "no", ["goal"] = g.Id == "d2" && Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") is "1" or "manual",
                 ["auto_release"] = Environment.GetEnvironmentVariable("APMT_SHOT_GOAL") != "manual", ["locations"] = locs, ["items"] = items,
                 ["errors"] = new JsonArray(), ["warning"] = "",
+                ["uncertain_note"] = g.Id == "d3" ? "Logic unknown: this demo check can't be judged." : "",
                 // Current area (games whose client reports where the player is)
                 ["area"] = g.Id == "d2" ? new JsonObject { ["state"] = "ok", ["name"] = g.Regions[0], ["locations"] = new JsonArray(1000, 1001, 5000) }
                          : g.Id == "d3" ? new JsonObject { ["state"] = "waiting", ["name"] = "", ["locations"] = new JsonArray(),

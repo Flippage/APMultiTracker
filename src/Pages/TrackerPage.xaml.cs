@@ -517,8 +517,9 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         bool hideExcluded = App.Config.HideExcluded && filter != CheckFilter.Hidden;
         IEnumerable<CheckItem> items = s.Locations.Where(l => !(hideExcluded && l.Excluded)).Where(l => filter switch
         {
-            CheckFilter.InLogic => l.IsInLogic || l.IsEntrance,
-            CheckFilter.Reachable => l.IsInLogic || l.IsEntrance || l.IsGlitched,
+            // Uncertain checks (logic unknown) are listed after the rest: they may or may not be reachable
+            CheckFilter.InLogic => l.IsInLogic || l.IsEntrance || l.IsUncertain,
+            CheckFilter.Reachable => l.IsInLogic || l.IsEntrance || l.IsGlitched || l.IsUncertain,
             CheckFilter.Hinted => l.HasHint && !l.IsHidden,
             CheckFilter.Hidden => l.IsHidden,
             CheckFilter.Entrances => l.IsEntrance,
@@ -1644,6 +1645,13 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             throw new InvalidOperationException($"A game waiting for its area shows “{quiet.AreaText}”.");
         if (App.Tracker.Slots.Any(s => !s.ShowAreaLine && s.AreaText.Length > 0))
             throw new InvalidOperationException("A game without area support shows an area line.");
+
+        // Checks whose logic is unknown: listed (with the reason) but never counted as in logic
+        var unsure = App.Tracker.Slots.First(s => s.Locations.Any(l => l.IsUncertain));
+        var q = unsure.Locations.First(l => l.IsUncertain);
+        if (unsure.InLogic != unsure.Locations.Count(l => l.IsInLogic && !l.Excluded) || q.IsInLogic || string.IsNullOrEmpty(q.Note)
+            || !unsure.Overview.Contains(q))
+            throw new InvalidOperationException("An uncertain check is counted as in logic, has no reason, or is missing from its column.");
     }
 
     /// <summary>Self-test: the All games Glitched switch takes glitched checks out of the columns and puts them back.</summary>

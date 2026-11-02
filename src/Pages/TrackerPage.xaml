@@ -128,7 +128,9 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <TextBlock x:Name="Unknown" Text="?" FontSize="13" FontWeight="Bold" Foreground="{StaticResource SubBrush}" VerticalAlignment="Center"
+                           HorizontalAlignment="Left" Margin="0,0,0,1" Visibility="Collapsed" ToolTip="{Binding StatusTip}"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontSize="14" TextTrimming="CharacterEllipsis"/>
                     <StackPanel Orientation="Horizontal" Visibility="{Binding ShowExcluded, Converter={StaticResource Vis}}" Margin="0,3,0,1">
@@ -163,6 +165,10 @@
                 <DataTrigger Binding="{Binding IsEntrance}" Value="True">
                     <Setter TargetName="HideBtn" Property="Visibility" Value="Collapsed"/>
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsUncertain}" Value="True">
+                    <Setter TargetName="Dot" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="Unknown" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsHidden}" Value="True">
                     <Setter TargetName="HideBtn" Property="Tag" Value="{StaticResource IconEye}"/>
                     <Setter TargetName="HideBtn" Property="ToolTip" Value="Show this check again"/>
@@ -174,7 +180,21 @@
         <!-- Compact check row (overview columns) -->
         <DataTemplate x:Key="MiniRow" DataType="{x:Type local:CheckItem}">
             <DockPanel ToolTip="{Binding Name}">
-                <Ellipse Width="6" Height="6" Fill="{Binding DotBrush}" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,9,0"/>
+                <Grid DockPanel.Dock="Left" Width="6" Margin="0,0,9,0" VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" Fill="{Binding DotBrush}">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUncertain}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="?" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource SubBrush}" HorizontalAlignment="Center"
+                               Margin="-4,-3,-4,0" Visibility="{Binding IsUncertain, Converter={StaticResource Vis}}" ToolTip="{Binding StatusTip}"/>
+                </Grid>
                 <Border DockPanel.Dock="Right" CornerRadius="5" Padding="5,0,5,1" Margin="6,0,0,0" Background="{StaticResource HintDimBrush}"
                         VerticalAlignment="Center" Visibility="{Binding HasHint, Converter={StaticResource Vis}}" ToolTip="{Binding Hint}">
                     <TextBlock Text="HINT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource HintBrush}"/>

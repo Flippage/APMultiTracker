@@ -143,6 +143,32 @@ def slot_data_options(game: str, slot_data: dict) -> dict:
         return {}
 
 
+# Pokédex checks whose logic a rebuild can't know: the logic follows the wild encounter tables, which are randomized
+# when the room is generated and not shared with trackers (no slot data / re_gen_passthrough for them), so a tracker's
+# rebuild rolls its own. Game -> (dexsanity option, wild randomization option). Pokémon Crystal is left out: its
+# apworld passes its real data to Universal Tracker.
+UNCERTAIN_PREFIX = "Pokedex - "
+UNCERTAIN_GAMES = {
+    "Pokemon Emerald": ("dexsanity", "wild_pokemon"),
+    "Pokemon Red and Blue": ("dexsanity", "randomize_wild_pokemon"),
+}
+
+
+def uncertain_checks(game: str, world) -> str:
+    """Why this game's Pokédex checks can't be judged, or "" when their logic is fine (dexsanity off, or wild
+    Pokémon not randomized)."""
+    names = UNCERTAIN_GAMES.get(game)
+    options = getattr(world, "options", None)
+    if not names or options is None:
+        return ""
+    dexsanity, wilds = (getattr(options, n, None) for n in names)
+    if not getattr(dexsanity, "value", 0) or not getattr(wilds, "value", 0):
+        return ""
+    return (f"Logic unknown: {game}'s wild Pokémon are randomized, and the room doesn't share where each one lives, "
+            f"so the tracker can't tell whether you can catch this one yet. Check your Pokédex in game for where "
+            f"you've seen it. These checks don't count toward the number in logic.")
+
+
 # ---------------------------------------------------------------------------------------------- slots
 
 class SlotContext(CommonContext):
@@ -171,6 +197,7 @@ class SlotContext(CommonContext):
         self.deferred_keys: list[str] = []
         self.deferred_callback: Optional[Callable] = None
         self.area = None   # areas.AreaWatcher: where the player is, for games whose client reports it
+        self.uncertain_note = ""   # set when some checks' logic can't be known (see uncertain_checks)
         self.persist_id = ""
         self.room_seed = ""
         self.warning = ""
@@ -432,6 +459,7 @@ class SlotContext(CommonContext):
 
         from . import areas
         self.area = areas.make(game, world_cls, core, self.team, self.slot)
+        self.uncertain_note = uncertain_checks(game, world)
 
         keys = getattr(world, "found_entrances_datastorage_key", None)
         callback = getattr(world, "reconnect_found_entrances", None)
@@ -612,6 +640,8 @@ class SlotContext(CommonContext):
                 status = "ignored"
             elif loc_id in in_logic:
                 status = "in_logic"
+            elif self.uncertain_note and name.startswith(UNCERTAIN_PREFIX):
+                status = "uncertain"   # the rebuild can't know this check's logic (see uncertain_checks)
             elif loc_id in glitched:
                 status = "glitched"
             else:
@@ -693,7 +723,8 @@ class SlotContext(CommonContext):
             "manual_items": list(getattr(core, "manual_items", [])),
             "errors": errors,
             "warning": self.warning,
-            "area": inputs["area"],   # games with an area adapter: {state, name, locations, detail}
+            "area": inputs["area"],
+            "uncertain_note": self.uncertain_note,   # why "uncertain" checks' logic can't be known   # games with an area adapter: {state, name, locations, detail}
         }
 
     # ---- explain / logical path

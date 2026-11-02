@@ -26,11 +26,16 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public bool IsHidden => Status == "ignored";
     public bool IsInLogic => Status == "in_logic";
     public bool IsGlitched => Status == "glitched";
+    /// <summary>The tracker can't know this check's logic (e.g. Pokédex checks with randomized wild Pokémon): shown with
+    /// a grey "?" and never counted as in logic.</summary>
+    public bool IsUncertain => Status == "uncertain";
+    /// <summary>Why the logic is unknown (uncertain checks).</summary>
+    public string? Note { get; init; }
     /// <summary>A reachable entrance whose destination isn't known yet (entrance randomizers), like UT's unconnected lines.</summary>
     public bool IsEntrance => Status == "entrance";
     public bool HasHint => !string.IsNullOrEmpty(Hint);
     /// <summary>Sort order: by status, with excluded checks after the others of the same status (as UT groups them).</summary>
-    public int Rank => Status switch { "in_logic" or "entrance" => 0, "glitched" => 2, "out_of_logic" => 4, _ => 6 } + (Excluded ? 1 : 0);
+    public int Rank => Status switch { "in_logic" or "entrance" => 0, "glitched" => 2, "uncertain" => 3, "out_of_logic" => 4, _ => 6 } + (Excluded ? 1 : 0);
     /// <summary>Shown with an EXCLUDED tag (not when hidden: the Hidden list is just that).</summary>
     public bool ShowExcluded => Excluded && !IsHidden;
 
@@ -44,6 +49,7 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public Brush NameBrush => Excluded && Status is "in_logic" or "glitched" ? Brushes2.Sub : Status switch
     {
         "in_logic" => Brushes2.Text,
+        "uncertain" => Brushes2.Sub,
         "entrance" => Brushes2.Entrance,   // like UT's unconnected lines
         "glitched" => Brushes2.GlitchedText,
         _ => Brushes2.Dim,
@@ -56,6 +62,7 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
         "entrance" => "An entrance you can reach but haven't been through yet. Where it leads shows up once you've found it",
         "glitched" => "Reachable with glitches / tricks",
         "ignored" => "Hidden",
+        "uncertain" => Note ?? "Logic unknown: the tracker can't tell whether this check is reachable",
         _ => "Out of logic",
     };
 }
@@ -257,7 +264,8 @@ public sealed class SlotView : INotifyPropertyChanged
 
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
-        var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" || (l.IsGlitched && App.Config.OverviewShowGlitched))
+        // Uncertain checks (logic unknown) stay visible: they may or may not be reachable
+        var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" or "uncertain" || (l.IsGlitched && App.Config.OverviewShowGlitched))
                                     && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
@@ -379,6 +387,7 @@ public sealed class SlotView : INotifyPropertyChanged
         AreaDetail = area?["detail"]?.GetValue<string>() ?? "";
         var here = (area?["locations"] as JsonArray)?.Select(n => Json.Long(n)).ToHashSet() ?? new HashSet<long>();
 
+        string uncertainNote = m["uncertain_note"]?.GetValue<string>() ?? "";
         var locs = new List<CheckItem>();
         if (m["locations"] is JsonArray arr)
             foreach (var n in arr)
@@ -391,7 +400,7 @@ public sealed class SlotView : INotifyPropertyChanged
                     o["status"]?.GetValue<string>() ?? "out_of_logic",
                     o["excluded"]?.GetValue<bool>() ?? false,
                     o["hint"]?.GetValue<string>(),
-                    o["key"]?.GetValue<string>()));
+                    o["key"]?.GetValue<string>()) { Note = uncertainNote.Length > 0 ? uncertainNote : null });
             }
         if (Released)
         {
@@ -413,7 +422,7 @@ public sealed class SlotView : INotifyPropertyChanged
         {
             // Locked by SlotLock: nothing is reachable yet, whatever the game's own logic says.
             locs = locs.Where(l => !l.IsEntrance)
-                       .Select(l => l.IsInLogic || l.IsGlitched ? l with { Status = "out_of_logic" } : l).ToList();
+                       .Select(l => l.IsInLogic || l.IsGlitched || l.IsUncertain ? l with { Status = "out_of_logic" } : l).ToList();
             GoMode = "no";
         }
         if (!HasArea) here.Clear();
