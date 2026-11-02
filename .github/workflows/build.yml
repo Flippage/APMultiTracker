@@ -30,7 +30,10 @@ jobs:
         id: ver
         shell: pwsh
         run: |
-          $v = "0.11.2"
+          # Test builds take the version from the project file, so they don't count as older than the latest release
+          # (which made them update themselves away as soon as they started).
+          $v = ([xml](Get-Content src/APMultiTracker.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if (-not $v) { throw "No <Version> in src/APMultiTracker.csproj" }
           if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart('v') }
           elseif ("${{ inputs.version }}" -ne "") { $v = "${{ inputs.version }}".TrimStart('v') }
           "version=$v" >> $env:GITHUB_OUTPUT
