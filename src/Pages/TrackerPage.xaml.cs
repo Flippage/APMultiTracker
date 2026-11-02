@@ -174,6 +174,16 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private DateTime _scrollStart;
     private const double ColumnGap = 10;   // each column's right margin
     private const double ScrollAnimMs = 220;
+    /// <summary>Closed "grabbing" hand while a column is dragged (Windows has no built-in one).</summary>
+    private static readonly Lazy<Cursor> GrabCursor = new(() =>
+    {
+        try
+        {
+            var res = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/grab.cur"));
+            return res == null ? Cursors.Hand : new Cursor(res.Stream, true);
+        }
+        catch { return Cursors.Hand; }
+    });
 
     /// <summary>Ranks every game by the active multiworld's saved column order; games it doesn't list keep room order after them.</summary>
     /// <param name="resort">Re-sort now (live sorting only catches up later); not while the slot list itself is changing.</param>
@@ -228,7 +238,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
             _dragging = true;
             Columns.CaptureMouse();
             if (Columns.ItemContainerGenerator.ContainerFromItem(_pressSlot) is UIElement c) c.Opacity = 0.45;
-            Mouse.OverrideCursor = Cursors.SizeWE;
+            Mouse.OverrideCursor = GrabCursor.Value;
             DropMarker.Height = Columns.ActualHeight;
             DropMarker.Visibility = Visibility.Visible;
             _dragScroll.Start();
@@ -1467,6 +1477,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private void SelfTestColumns()
     {
         var mw = App.Tracker.Active ?? throw new InvalidOperationException("Self-test expected an active multiworld.");
+        if (GrabCursor.Value == Cursors.Hand) throw new InvalidOperationException("The grab cursor didn't load.");
         var saved = mw.ColumnOrder.ToList();
         var order = ColumnOrderNow();
         if (order.Count < 3) return;

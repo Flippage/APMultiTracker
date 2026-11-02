@@ -25,6 +25,7 @@
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\gomode.wav" />
+    <Resource Include="Assets\grab.cur" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,9 +5,10 @@
 - **All games: drag columns into your own order**: press on a game's header (its art and name) and drag it left or
   right; a blue line shows where it will land. The order is remembered for each multiworld. Games locked by
   SlotLock still stay after the unlocked ones, so you order each group on its own. A plain click still focuses the
-  game, and Esc cancels a drag. Dragging near the left or right edge scrolls the columns.
+  game, and Esc cancels a drag. While dragging, the pointer is a closed (grabbing) hand. Dragging near the left or right
+  edge scrolls the columns.
 - **All games: scroll arrows**: when the columns don't all fit, round arrows on the left and right scroll just far
-  enough to show the next whole column.
+  enough to show the next whole column. Hovering one gives it the same blue ring as other buttons.
 
 ## v0.11.3
 

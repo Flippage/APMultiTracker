@@ -14,19 +14,24 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#F0202020" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="19">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.6" Color="Black"/>
-                            </Border.Effect>
-                            <Viewbox Width="16" Height="16">
-                                <Path Style="{StaticResource Icon}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"/>
-                            </Viewbox>
-                        </Border>
+                        <Grid>
+                            <Border x:Name="Bd" Background="#F0202020" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="19">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.6" Color="Black"/>
+                                </Border.Effect>
+                                <Viewbox Width="16" Height="16">
+                                    <Path Style="{StaticResource Icon}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"/>
+                                </Viewbox>
+                            </Border>
+                            <!-- Hover ring: 2px like the other buttons, drawn over the 1px edge so nothing shifts -->
+                            <Border x:Name="Ring" CornerRadius="19" BorderThickness="2" BorderBrush="{StaticResource AccentBrush}" Opacity="0"
+                                    IsHitTestVisible="False"/>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#F02C2C2C"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Ring" Property="Opacity" Value="1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
