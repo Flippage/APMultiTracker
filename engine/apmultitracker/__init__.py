@@ -13,7 +13,7 @@ from settings import Group
 from worlds.AutoWorld import World
 from worlds.LauncherComponents import Component, Type, components, icon_paths
 
-ENGINE_VERSION = "0.4.15"
+ENGINE_VERSION = "0.4.16"
 COMPONENT_NAME = "APMultiTracker Engine"
 
 

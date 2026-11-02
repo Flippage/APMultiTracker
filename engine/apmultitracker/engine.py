@@ -195,6 +195,52 @@ def _emerald_free_fly(world, core, slot_data: dict) -> None:
     world.free_fly_location_id = target
 
 
+def _emerald_wild_encounters(world, core) -> list[dict]:
+    """Pokémon Emerald's wild encounter spots, like the Emerald PopTracker pack's encounter locations: one row per map
+    and method (grass/caves, surfing, each rod). Which Pokémon live there is randomized and not shared with trackers,
+    but whether you can get there with the right gear is real logic: the apworld's per-map encounter regions."""
+    import re
+    import zlib
+    from .areas import _sub
+    data = _sub(type(world), "data").data
+    rows: dict[str, dict] = {}
+    for region in core.multiworld.regions:
+        if region.player != core.player_id:
+            continue
+        m = re.match(r"^(MAP_.+)_(LAND|WATER|FISHING)_ENCOUNTERS$", region.name)
+        if not m:
+            continue
+        map_name, kind = m.groups()
+        label = data.maps[map_name].label if map_name in data.maps else map_name
+        for loc in region.locations:
+            if kind == "LAND":
+                method = "Grass & caves"
+            elif kind == "WATER":
+                method = "Surfing"
+            else:
+                rod = next((r for r in ("OLD_ROD", "GOOD_ROD", "SUPER_ROD") if f"_{r}_" in loc.name), "")
+                method = rod.replace("_", " ").title() if rod else "Fishing"
+            key = f"{map_name}/{method}"
+            row = rows.get(key)
+            if row is None:
+                row = rows[key] = {
+                    "id": -(10 ** 12) - zlib.crc32(key.encode()),   # stable, apart from real and entrance ids
+                    "name": f"{label} · {method}", "key": region.name, "group": "Wild encounters", "map": map_name,
+                    "note": (f"Wild Pokémon by {method.lower()} on {label}. Which Pokémon live here is randomized and "
+                             f"not shared with trackers; this shows whether you can get here with what it takes. "
+                             f"Hide it once you've caught what's here."),
+                    "locations": [],
+                }
+            row["locations"].append(loc)
+    return sorted(rows.values(), key=lambda r: r["name"])
+
+
+# Per game: rows to list that aren't checks (no location id; hideable; never counted).
+EXTRA_ROWS: dict[str, Callable] = {
+    "Pokemon Emerald": _emerald_wild_encounters,
+}
+
+
 # Per game: values the rebuild picks at random during generation (not options) that the room shares in slot data.
 POST_BUILD_FIXES: dict[str, Callable] = {
     "Pokemon Emerald": _emerald_free_fly,
@@ -248,6 +294,7 @@ class SlotContext(CommonContext):
         self.deferred_callback: Optional[Callable] = None
         self.area = None   # areas.AreaWatcher: where the player is, for games whose client reports it
         self.uncertain_note = ""   # set when some checks' logic can't be known (see uncertain_checks)
+        self.extra_rows: list[dict] = []   # rows that aren't checks (see EXTRA_ROWS)
         self.persist_id = ""
         self.room_seed = ""
         self.warning = ""
@@ -523,6 +570,18 @@ class SlotContext(CommonContext):
         from . import areas
         self.area = areas.make(game, world_cls, core, self.team, self.slot)
         self.uncertain_note = uncertain_checks(game, world)
+        self.extra_rows = []
+        if game in EXTRA_ROWS and self.uncertain_note:   # wild encounter spots matter when dexsanity is on
+            try:
+                self.extra_rows = EXTRA_ROWS[game](world, core)
+            except Exception:
+                log.warning(f"{slot_name}: couldn't list {game}'s extra rows", exc_info=True)
+        # The current area lists its extra rows too (e.g. the map's wild encounter spots)
+        by_map = getattr(self.area, "by_map", None)
+        if isinstance(by_map, dict):
+            for e in self.extra_rows:
+                if e.get("map"):
+                    by_map.setdefault(e["map"], set()).add(e["id"])
 
         keys = getattr(world, "found_entrances_datastorage_key", None)
         callback = getattr(world, "reconnect_found_entrances", None)
@@ -701,10 +760,10 @@ class SlotContext(CommonContext):
             loc = cache.get(name)
             if loc_id in core.ignored_locations:
                 status = "ignored"
+            elif self.uncertain_note and name.startswith(UNCERTAIN_PREFIX):
+                status = "uncertain"   # the rebuild can't know this check's logic, whatever it says (uncertain_checks)
             elif loc_id in in_logic:
                 status = "in_logic"
-            elif self.uncertain_note and name.startswith(UNCERTAIN_PREFIX):
-                status = "uncertain"   # the rebuild can't know this check's logic (see uncertain_checks)
             elif loc_id in glitched:
                 status = "glitched"
             else:
@@ -719,6 +778,20 @@ class SlotContext(CommonContext):
                 "excluded": bool(loc is not None and loc.progress_type == LocationProgressType.EXCLUDED),
                 "hint": inputs["hint_text"].get(loc_id),
             })
+
+        # Extra rows that aren't checks (e.g. Emerald's wild encounter spots): logic colours, hideable, never counted
+        extras = []
+        for e in self.extra_rows:
+            if e["id"] in core.ignored_locations:
+                status = "ignored"
+            elif ret.state is not None and any(loc.can_reach(ret.state) for loc in e["locations"]):
+                status = "in_logic"
+            elif ret.glitches_state is not None and any(loc.can_reach(ret.glitches_state) for loc in e["locations"]):
+                status = "glitched"
+            else:
+                status = "out_of_logic"
+            extras.append({"id": e["id"], "name": e["name"], "key": e["key"], "region": e["group"], "status": status,
+                           "excluded": False, "hint": None, "extra": True, "note": e["note"]})
 
         go_mode = "no"
         if ret.state is not None and mw.has_beaten_game(ret.state, core.player_id):
@@ -776,7 +849,7 @@ class SlotContext(CommonContext):
             "goal": inputs["goal"],
             "auto_release": inputs["auto_release"],
             "entrances": [] if inputs["goal"] and inputs["auto_release"] else entrances,
-            "locations": locations,
+            "locations": locations + extras,
             "items": items,
             "events": events,
             "hint_points": inputs["hint_points"],

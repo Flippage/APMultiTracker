@@ -18,9 +18,10 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     public string? HereArea { get; init; }
     public bool Here => HereArea != null;
     /// <summary>Region heading, with the player's current area first under its own heading.</summary>
-    public string GroupKey => HereArea != null ? "📍 Current area: " + HereArea : Region;
-    /// <summary>Without region groups: the current area's checks under one heading, the rest with none.</summary>
-    public string HereGroup => HereArea != null ? "📍 Current area: " + HereArea : "";
+    public string GroupKey => HereArea != null ? "📍 Current area: " + HereArea : Extra ? "🌿 " + Region : Region;
+    /// <summary>Without region groups: the current area's checks under one heading, extra rows under theirs, the rest
+    /// with none.</summary>
+    public string HereGroup => HereArea != null ? "📍 Current area: " + HereArea : Extra ? "🌿 " + Region : "";
     /// <summary>The location's real name (Name may include an alias), for explain / logical path.</summary>
     public string LookupName => string.IsNullOrEmpty(Key) ? Name : Key;
     public bool IsHidden => Status == "ignored";
@@ -29,8 +30,11 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
     /// <summary>The tracker can't know this check's logic (e.g. Pokédex checks with randomized wild Pokémon): shown with
     /// a grey "?" and never counted as in logic.</summary>
     public bool IsUncertain => Status == "uncertain";
-    /// <summary>Why the logic is unknown (uncertain checks).</summary>
+    /// <summary>Why the logic is unknown (uncertain checks), or what an extra row is.</summary>
     public string? Note { get; init; }
+    /// <summary>Not a check, e.g. a wild encounter spot (Pokémon Emerald): listed with logic colours and hideable,
+    /// but never counted and not in the All games columns.</summary>
+    public bool Extra { get; init; }
     /// <summary>A reachable entrance whose destination isn't known yet (entrance randomizers), like UT's unconnected lines.</summary>
     public bool IsEntrance => Status == "entrance";
     public bool HasHint => !string.IsNullOrEmpty(Hint);
@@ -63,6 +67,7 @@ public sealed record CheckItem(long Id, string Name, string Region, string Statu
         "glitched" => "Reachable with glitches / tricks",
         "ignored" => "Hidden",
         "uncertain" => Note ?? "Logic unknown: the tracker can't tell whether this check is reachable",
+        _ when Extra && Note != null => Note,
         _ => "Out of logic",
     };
 }
@@ -265,7 +270,7 @@ public sealed class SlotView : INotifyPropertyChanged
     private static List<CheckItem> SortOverview(IEnumerable<CheckItem> locs)
     {
         // Uncertain checks (logic unknown) stay visible: they may or may not be reachable
-        var shown = locs.Where(l => (l.Status is "in_logic" or "entrance" or "uncertain" || (l.IsGlitched && App.Config.OverviewShowGlitched))
+        var shown = locs.Where(l => !l.Extra && (l.Status is "in_logic" or "entrance" or "uncertain" || (l.IsGlitched && App.Config.OverviewShowGlitched))
                                     && !(l.Excluded && App.Config.HideExcluded));
         return (App.Config.OverviewGroupByRegion
                 ? shown.OrderBy(l => l.Here ? 0 : 1).ThenBy(l => l.GroupKey, NaturalComparer.Instance).ThenBy(l => l.Rank).ThenBy(l => l.Name, NaturalComparer.Instance)
@@ -400,7 +405,11 @@ public sealed class SlotView : INotifyPropertyChanged
                     o["status"]?.GetValue<string>() ?? "out_of_logic",
                     o["excluded"]?.GetValue<bool>() ?? false,
                     o["hint"]?.GetValue<string>(),
-                    o["key"]?.GetValue<string>()) { Note = uncertainNote.Length > 0 ? uncertainNote : null });
+                    o["key"]?.GetValue<string>())
+                {
+                    Extra = o["extra"]?.GetValue<bool>() ?? false,
+                    Note = o["note"]?.GetValue<string>() ?? (uncertainNote.Length > 0 ? uncertainNote : null),
+                });
             }
         if (Released)
         {
@@ -427,13 +436,13 @@ public sealed class SlotView : INotifyPropertyChanged
         }
         if (!HasArea) here.Clear();
         if (here.Count > 0) locs = locs.Select(l => here.Contains(l.Id) ? l with { HereArea = AreaName } : l).ToList();
-        HereCount = locs.Count(l => l.Here && !l.IsHidden && !l.IsEntrance);
-        HereInLogic = locs.Count(l => l.Here && l.IsInLogic && !l.Excluded);
-        HereGlitched = locs.Count(l => l.Here && l.IsGlitched && !l.Excluded);
+        HereCount = locs.Count(l => l.Here && !l.IsHidden && !l.IsEntrance && !l.Extra);
+        HereInLogic = locs.Count(l => l.Here && l.IsInLogic && !l.Excluded && !l.Extra);
+        HereGlitched = locs.Count(l => l.Here && l.IsGlitched && !l.Excluded && !l.Extra);
         Entrances = locs.Count(l => l.IsEntrance);
         // Excluded checks are ones you've chosen not to care about: they don't count toward in logic / glitched.
-        InLogic = locs.Count(l => l.IsInLogic && !l.Excluded);
-        Glitched = locs.Count(l => l.IsGlitched && !l.Excluded);
+        InLogic = locs.Count(l => l.IsInLogic && !l.Excluded && !l.Extra);
+        Glitched = locs.Count(l => l.IsGlitched && !l.Excluded && !l.Extra);
         Locations = locs;
 
         var items = new List<ItemCount>();

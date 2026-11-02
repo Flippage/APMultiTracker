@@ -105,7 +105,13 @@ public static class Demo
             locs.Add(new JsonObject { ["id"] = 9000, ["name"] = "Hidden example", ["region"] = g.Regions[0], ["status"] = "ignored", ["excluded"] = false, ["hint"] = null });
             // A check whose logic can't be known (like Pokédex checks with randomized wild Pokémon)
             if (g.Id == "d3")
+            {
                 locs.Add(new JsonObject { ["id"] = 9100, ["name"] = "Pokedex - Example", ["region"] = g.Regions[0], ["status"] = "uncertain", ["excluded"] = false, ["hint"] = null });
+                // A row that isn't a check (like Emerald's wild encounter spots)
+                locs.Add(new JsonObject { ["id"] = -1000000000001L, ["name"] = "Route 101 · Grass & caves", ["region"] = "Wild encounters",
+                                          ["status"] = "in_logic", ["excluded"] = false, ["hint"] = null, ["extra"] = true,
+                                          ["note"] = "Wild Pokémon by grass & caves on Route 101." });
+            }
             var items = new JsonArray();
             foreach (var it in new[] { "Progressive Sword", "Bombs", "Hookshot", "Bottle", "Rupees (50)", "Heart Container" })
                 items.Add(new JsonObject { ["name"] = it, ["count"] = rng.Next(1, 4), ["prog"] = it.Length < 9 });

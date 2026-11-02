@@ -24,7 +24,7 @@
   Other games don't report where the player is (or not in a way the tracker can use yet), so they're unchanged.
 - **Pokédex checks** (dexsanity, e.g. Pokémon Emerald, Red and Blue, Crystal): the tracker can't judge them (an entry
   also shows up when you've only seen a Pokémon, say in a trainer battle, and wild Pokémon can be randomized), so with
-  dexsanity on they show a grey **?** (hover for why). They're still listed in the game's list and its All games
+  dexsanity on they all show a grey **?** (hover for why), even ones the logic thinks are reachable. They're still listed in the game's list and its All games
   column, so you can see what you haven't caught yet, but they no longer count toward the number in logic.
 - **Random YAML options use the room's values** (engine v0.4.15): for games without Universal Tracker support, any
   option the room shares (most games share their settings) is taken from the room instead of being rolled again
@@ -32,6 +32,11 @@
   (picked at random while generating) comes from the room too, so the logic no longer flies you somewhere else.
 - The engine is reinstalled whenever the app's copy differs from the one in Archipelago, not only when its version
   number goes up.
+- **Pokémon Emerald: Wild encounters** (with dexsanity on, like the Emerald PopTracker pack's encounter spots): a
+  **🌿 Wild encounters** group lists every map's encounter spots by method (grass & caves, surfing, Old / Good / Super
+  Rod), coloured by whether you can get there with what it takes. Which Pokémon live there is randomized and not shared
+  with trackers, so hide a spot (eye button) once you've caught what's there. They aren't checks: they don't count
+  toward any number and aren't in the All games columns. Your current area lists its own spots too.
 
 ## v0.11.4
 
