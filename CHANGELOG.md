@@ -2,7 +2,7 @@
 
 ## v0.12.0
 
-- **Current area** (engine v0.4.13): for games whose client reports where you are, the checks in the area you're
+- **Current area** (engine v0.4.14): for games whose client reports where you are, the checks in the area you're
   standing in move to the top of the game's list under **📍 Current area: …** (and to the top of its All games
   column), each tagged **HERE**. The game's header and column show where you are and how many checks are left there.
   Works while the game's own client is connected, for:

@@ -78,7 +78,13 @@ class _Unavailable(AreaWatcher):
 
 
 def _package(world_cls) -> str:
-    return world_cls.__module__.rsplit(".", 1)[0] if "." in world_cls.__module__ else world_cls.__module__
+    """The apworld's package: the world's module itself when the World class is defined in its __init__.py (most
+    apworlds), else the package that module is in."""
+    import sys
+    module = world_cls.__module__
+    if hasattr(sys.modules.get(module), "__path__"):
+        return module
+    return module.rsplit(".", 1)[0] if "." in module else module
 
 
 def _sub(world_cls, name: str):
@@ -114,7 +120,7 @@ class _Emerald(AreaWatcher):
     def __init__(self, world_cls, core, team: int, slot: int):
         super().__init__([])
         data = _sub(world_cls, "data").data
-        self.map_name = {v: k for k, v in data.constants.items() if k.startswith("MAP_") and isinstance(v, int)}
+        self.map_name = {v: k for k, v in data.constants.items() if k in data.maps and isinstance(v, int)}
         self.label = {name: m.label for name, m in data.maps.items()}
         self.by_map: dict[str, set[int]] = collections.defaultdict(set)
         for loc in core.multiworld.get_locations(core.player_id):
