@@ -62,7 +62,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         PreviewKeyDown += (_, e) => { if (_dragging && e.Key == Key.Escape) { EndColumnDrag(false); e.Handled = true; } };
         _dragScroll.Tick += (_, _) => DragAutoScroll();
         _scrollAnim.Tick += (_, _) => StepScrollAnimation();
-        App.Tracker.Slots.CollectionChanged += (_, _) => ApplyColumnOrder();
+        App.Tracker.Slots.CollectionChanged += (_, _) => ApplyColumnOrder(resort: false);
 
         _searchDebounce.Tick += (_, _) => { _searchDebounce.Stop(); RefreshList(); };
         App.Tracker.Changed += OnTrackerChanged;
@@ -176,14 +176,18 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
     private const double ScrollAnimMs = 220;
 
     /// <summary>Ranks every game by the active multiworld's saved column order; games it doesn't list keep room order after them.</summary>
-    private void ApplyColumnOrder()
+    /// <param name="resort">Re-sort now (live sorting only catches up later); not while the slot list itself is changing.</param>
+    private void ApplyColumnOrder(bool resort = true)
     {
         var order = App.Tracker.Active?.ColumnOrder ?? new List<string>();
+        bool changed = false;
         foreach (var s in App.Tracker.Slots)
         {
             int i = order.IndexOf(s.Ref.Id);
-            s.ColumnRank = i >= 0 ? i : 100_000 + s.Index;
+            int rank = i >= 0 ? i : 100_000 + s.Index;
+            if (s.ColumnRank != rank) { s.ColumnRank = rank; changed = true; }
         }
+        if (changed && resort) _columnsView.Refresh();
     }
 
     private List<SlotView> ColumnOrderNow() => _columnsView.Cast<SlotView>().ToList();
