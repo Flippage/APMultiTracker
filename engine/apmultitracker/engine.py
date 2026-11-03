@@ -234,37 +234,48 @@ def _emerald_wild_encounters(world, core) -> list[dict]:
         table = (data.maps[map_name].encounters or {}).get(kind)   # keyed by PokemonSource, a str enum
         slots = list(getattr(table, "slots", []) or [])
         rates = _EMERALD_RATES[kind]
-        groups = ([("Grass & caves" if kind == "LAND" else "Surfing", range(len(rates)))] if kind != "FISHING"
-                  else _EMERALD_RODS)
-        for method, slot_range in groups:
+
+        def chance_of(slot_range) -> dict:
+            """Vanilla species -> chance within these slots (in slot order)."""
             idx = [i for i in slot_range if i < len(slots)]
-            if not idx:
-                continue
-            # The locations that stand for this method (fishing: the rod's own, with its rule)
-            locs = [loc for loc in region.locations
-                    if kind != "FISHING" or f"_{method.replace(' ', '_').upper()}_" in loc.name]
-            if not locs:
-                continue
-            # One row per vanilla species, in slot order, with its combined chance
-            order, chance = [], {}
+            out: dict = {}
             for i in idx:
-                species = slots[i]
-                if species not in chance:
-                    order.append(species)
-                    chance[species] = 0.0
-                chance[species] += 100 / len(idx) if normalized else rates[i]
-            for n, species in enumerate(order, 1):
-                key = f"{map_name}/{method}/{n}"
-                rows.append({
-                    "id": -(10 ** 12) - zlib.crc32(key.encode()),   # stable, apart from real and entrance ids
-                    "name": f"{label} · {method} encounter {n}, {_rate(chance[species])}",
-                    "key": region.name, "group": "Wild encounters", "map": map_name,
-                    "note": (f"A wild Pokémon found by {method.lower()} on {label} ({_rate(chance[species])} of "
-                             f"encounters there). Which Pokémon it is is randomized and not shared with trackers; "
-                             f"this shows whether you can get here with what it takes. Hide it once you've caught it."),
-                    "locations": locs,
-                    "order": (label, ["Grass & caves", "Surfing", "Old Rod", "Good Rod", "Super Rod"].index(method), n),
-                })
+                out[slots[i]] = out.get(slots[i], 0.0) + (100 / len(idx) if normalized else rates[i])
+            return out
+
+        def add(method: str, order: int, n: int, chance: str, locs: list) -> None:
+            key = f"{map_name}/{method}/{n}"
+            rows.append({
+                "id": -(10 ** 12) - zlib.crc32(key.encode()),   # stable, apart from real and entrance ids
+                "name": f"{label} · {method} encounter {n}, {chance}",
+                "key": region.name, "group": "Wild encounters", "map": map_name,
+                "note": (f"A wild Pokémon found by {method.lower()} on {label} ({chance} of encounters there). Which "
+                         f"Pokémon it is is randomized and not shared with trackers; this shows whether you can get "
+                         f"here with what it takes. Hide it once you've caught it."),
+                "locations": locs,
+                "order": (label, order, n),
+            })
+
+        if kind != "FISHING":
+            chance = chance_of(range(len(rates)))
+            for n, species in enumerate(chance, 1):
+                add("Grass & caves" if kind == "LAND" else "Surfing", 0 if kind == "LAND" else 1, n,
+                    _rate(chance[species]), list(region.locations))
+            continue
+        # Fishing: the three rods fish one table, so the same Pokémon can be on more than one rod (at a different
+        # chance on each). Like the PopTracker pack: one row per Pokémon, naming every rod that finds it.
+        per_rod = [(rod, chance_of(r), [loc for loc in region.locations
+                                        if f"_{rod.replace(' ', '_').upper()}_" in loc.name])
+                   for rod, r in _EMERALD_RODS]
+        order: list = []
+        for _, chance, _ in per_rod:
+            order += [sp for sp in chance if sp not in order]
+        for n, species in enumerate(order, 1):
+            rods = [(rod, chance[species], locs) for rod, chance, locs in per_rod if species in chance and locs]
+            if not rods:
+                continue
+            method = "-".join(rod.replace(" Rod", "") for rod, _, _ in rods) + " Rod"
+            add(method, 2, n, "-".join(_rate(c) for _, c, _ in rods), [loc for _, _, locs in rods for loc in locs])
     return sorted(rows, key=lambda r: r["order"])
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.12.6
+
+- **Pokémon Emerald: fishing encounters match the PopTracker pack** (engine v0.4.20): the three rods fish from one
+  table, so the same Pokémon can be on more than one rod at different chances. Each fishing encounter is now one row
+  naming every rod that finds it, e.g. "Ever Grande City · Old-Good Rod encounter 2, 50%-33.3%", instead of a separate
+  row per rod. (Fishing rows you'd hidden show again, since they're new rows.)
+
 ## v0.12.5
 
 - **The Wind Waker: Current area** (engine v0.4.19): in a dungeon, boss arena, cave, grotto or fairy fountain, its
