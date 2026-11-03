@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -255,8 +256,25 @@ public partial class MainWindow : Window
     private void FocusCard_Click(object sender, MouseButtonEventArgs e)
     {
         if (App.Tracker.Slots.Count == 0) { GoToTracker(); return; }
+        // A click on the card while the picker is open closes it (the press already closed it: don't reopen)
+        if (GamePicker.IsOpen || (DateTime.UtcNow - _pickerClosedAt).TotalMilliseconds < 400) { GamePicker.IsOpen = false; return; }
         BuildGamePicker();
+        // Fit inside the window: no taller than it, and grown upward from the card's bottom edge
+        GamePickerScroll.MaxHeight = Math.Max(160, ActualHeight - 140);
+        GamePicker.CustomPopupPlacementCallback = PlaceGamePicker;
         GamePicker.IsOpen = true;
+    }
+
+    private DateTime _pickerClosedAt = DateTime.MinValue;
+    private void GamePicker_Closed(object? sender, EventArgs e) => _pickerClosedAt = DateTime.UtcNow;
+
+    /// <summary>Right of the focus card, bottom edges lined up, but never above the window's top.</summary>
+    private CustomPopupPlacement[] PlaceGamePicker(Size popup, Size target, Point offset)
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);   // the sizes here are in device pixels
+        double cardTop = FocusCard.TranslatePoint(new Point(0, 0), this).Y * dpi.DpiScaleY;
+        double y = Math.Max(target.Height - popup.Height + 16 * dpi.DpiScaleY, -cardTop + 12 * dpi.DpiScaleY);
+        return new[] { new CustomPopupPlacement(new Point(target.Width + 10 * dpi.DpiScaleX, y), PopupPrimaryAxis.Horizontal) };
     }
 
     private void FocusPrev_Click(object sender, RoutedEventArgs e) { App.Tracker.CycleFocus(-1); e.Handled = true; }

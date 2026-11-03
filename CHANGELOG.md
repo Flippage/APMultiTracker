@@ -4,7 +4,8 @@
 
 - **Switch games from any page**: the focused game card in the sidebar has **‹ ›** buttons to step to the previous /
   next game (like Ctrl+Tab), and clicking the card opens a panel with every game's box art and number in logic: click
-  one to focus it. Handy on the Feed page, which had no way to switch games.
+  one to focus it (click the card again to close it). Handy on the Feed page, which had no way to switch games. The
+  panel opens beside the card and always fits inside the window.
 
 ## v0.12.2
 
