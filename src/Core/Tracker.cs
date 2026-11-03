@@ -191,7 +191,8 @@ public sealed class SlotView : INotifyPropertyChanged
     public bool ShowCount => !Goal && !Locked && !IsSlotLock;
     /// <summary>Where the player is right now ("" when the game doesn't report it or isn't running).</summary>
     public string AreaName { get; private set; } = "";
-    /// <summary>"" = this game has no area support; else "ok", "waiting", "unrecognised" or "unavailable".</summary>
+    /// <summary>"" = this game has no area support; else "ok", "label" (known, but no checks to list), "waiting",
+    /// "unrecognised" or "unavailable".</summary>
     public string AreaState { get; private set; } = "";
     /// <summary>Why the area isn't shown (for the tooltip), when it isn't.</summary>
     public string AreaDetail { get; private set; } = "";
@@ -207,6 +208,7 @@ public sealed class SlotView : INotifyPropertyChanged
     {
         "" => "",
         _ when HasArea => $"📍 {AreaName}" + (HereCount > 0 ? $" · {HereCount} {(HereCount == 1 ? "check" : "checks")} here" : " · no checks here"),
+        "label" => $"📍 Area: {AreaName}",   // known but not a place with checks, e.g. The Wind Waker's "At Sea"
         "unrecognised" => "📍 Area: not recognised",
         "unavailable" => "📍 Area: unavailable",
         _ => "📍 Area: not reported",

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.5
+
+- **The Wind Waker: Current area** (engine v0.4.19): in a dungeon, boss arena, cave, grotto or fairy fountain, its
+  checks go to the top under **📍 Current area**, like the other supported games. Out on the sea (and inside houses on
+  the islands) the game only reports that you're at sea, not near which island, so it shows a grey **📍 Area: At Sea**
+  and the sea's checks stay grouped by island. Stage names from Mysteryem's The Wind Waker PopTracker pack (MIT
+  licence), with thanks.
+
 ## v0.12.4
 
 - **Check lists group by place when a game lumps most of itself into one region**: The Wind Waker's apworld puts ~200

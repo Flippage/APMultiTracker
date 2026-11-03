@@ -48,6 +48,10 @@ class AreaWatcher:
     def _waiting(self, note: str = "") -> bool:
         return self._change("waiting", "", (), note)
 
+    def _label(self, name: str, detail: str) -> bool:
+        """Known, but not a place with checks to list (e.g. The Wind Waker's open sea): shown in grey as "Area: <name>"."""
+        return self._change("label", name, (), detail)
+
     def _unknown(self, value: Any) -> bool:
         return self._change("unrecognised", "", (), (
             f"{self.game} reported “{value}”, which the tracker doesn't recognise as a place. Its client or apworld "
@@ -350,7 +354,39 @@ class _UTMap(AreaWatcher):
         return self._set(label.title() if label.islower() else label, self.by_map.get(name, ()))
 
 
+# ---------------------------------------------------------------------------------------------- The Wind Waker
+# The Dolphin client sends {"tww_stage_name": ...} to its slot's trackers on every stage change. Stage names -> places
+# come from Mysteryem's The Wind Waker PopTracker pack (MIT); the places are the apworld's region names (dungeons,
+# boss arenas, caves, fountains). The open sea is one stage ("sea") and the apworld's single "The Great Sea" region,
+# so out there (and in island interiors) it's only known that you're at sea, not near which island.
+
+class _WindWaker(AreaWatcher):
+    def __init__(self, world_cls, core, team: int, slot: int):
+        super().__init__([])
+        from . import area_tww
+        self.stages = area_tww.STAGES
+        self.by_region: dict[str, set[int]] = collections.defaultdict(set)
+        for loc in core.multiworld.get_locations(core.player_id):
+            if loc.address is not None and loc.parent_region is not None:
+                self.by_region[loc.parent_region.name].add(loc.address)
+
+    def on_bounce(self, data: dict) -> bool:
+        if not isinstance(data, dict) or "tww_stage_name" not in data:
+            return False
+        stage = str(data.get("tww_stage_name") or "")
+        if not stage:
+            return self._waiting()
+        tab, place = self.stages.get(stage, ("The Great Sea", ""))
+        area = place or (tab if tab != "The Great Sea" else "")
+        if not area:
+            return self._label("At Sea", "You're on The Great Sea, or inside somewhere on an island. The Wind Waker only "
+                                         "reports that, not which island you're near, so there's no area to list; "
+                                         "the sea's checks are grouped by island below.")
+        return self._set(area, self.by_region.get(area, ()))
+
+
 ADAPTERS: dict[str, Callable[..., AreaWatcher]] = {
+    "The Wind Waker": _WindWaker,
     "Pokemon Emerald": _Emerald,
     "The Minish Cap": _MinishCap,
     "Paper Mario: The Thousand-Year Door": _TTYD,
