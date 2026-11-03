@@ -6,9 +6,6 @@
   next game (like Ctrl+Tab), and clicking the card opens a panel with every game's box art and number in logic: click
   one to focus it (click the card again to close it). Handy on the Feed page, which had no way to switch games. The
   panel opens beside the card and always fits inside the window.
-
-## v0.12.2
-
 - **Resize the Items / Hints panel**: drag its left edge (a grip appears on hover) to make it wider or narrower, so
   long item names fit. Remembered.
 - Hover an item you've received to see its full name (and how many).
