@@ -54,6 +54,11 @@ public partial class MainWindow : Window
         SideDock.SizeChanged += (_, _) => UpdateArtVisibility();
         FocusCard.SizeChanged += (_, _) => UpdateArtVisibility();
         PreviewKeyDown += OnPreviewKeyDown;
+        // The game picker closes on a click elsewhere, Esc, or when the window moves, resizes or loses focus
+        PreviewMouseDown += Window_PreviewMouseDownForPicker;
+        Deactivated += (_, _) => GamePicker.IsOpen = false;
+        LocationChanged += (_, _) => GamePicker.IsOpen = false;
+        SizeChanged += (_, _) => GamePicker.IsOpen = false;
 
         UpdateEngineChip();
         UpdateFocusCard();
@@ -118,6 +123,7 @@ public partial class MainWindow : Window
     /// <summary>Ctrl+1…9 focus a game, Ctrl+0 / Esc-free overview, Ctrl+Tab cycles.</summary>
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && GamePicker.IsOpen) { GamePicker.IsOpen = false; e.Handled = true; return; }
         if (ArtLayer.Visibility == Visibility.Visible || ConfirmLayer.Visibility == Visibility.Visible) return;
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
@@ -256,24 +262,39 @@ public partial class MainWindow : Window
     private void FocusCard_Click(object sender, MouseButtonEventArgs e)
     {
         if (App.Tracker.Slots.Count == 0) { GoToTracker(); return; }
-        // A click on the card while the picker is open closes it (the press already closed it: don't reopen)
-        if (GamePicker.IsOpen || (DateTime.UtcNow - _pickerClosedAt).TotalMilliseconds < 400) { GamePicker.IsOpen = false; return; }
+        // The card toggles the picker
+        if (GamePicker.IsOpen) { GamePicker.IsOpen = false; return; }
         BuildGamePicker();
-        // Fit inside the window: no taller than it, and grown upward from the card's bottom edge
-        GamePickerScroll.MaxHeight = Math.Max(160, ActualHeight - 140);
+        GamePickerScroll.MaxHeight = Math.Max(160, ActualHeight - 140);   // never taller than the window
         GamePicker.CustomPopupPlacementCallback = PlaceGamePicker;
         GamePicker.IsOpen = true;
     }
 
-    private DateTime _pickerClosedAt = DateTime.MinValue;
-    private void GamePicker_Closed(object? sender, EventArgs e) => _pickerClosedAt = DateTime.UtcNow;
+    /// <summary>Closes the picker on a click anywhere else in the window (it stays open itself, so the card can toggle it).</summary>
+    private void Window_PreviewMouseDownForPicker(object sender, MouseButtonEventArgs e)
+    {
+        if (!GamePicker.IsOpen || e.OriginalSource is not DependencyObject d) return;
+        if (IsWithin(d, FocusCard) || (GamePicker.Child != null && IsWithin(d, GamePicker.Child))) return;
+        GamePicker.IsOpen = false;
+    }
 
-    /// <summary>Right of the focus card, bottom edges lined up, but never above the window's top.</summary>
+    private static bool IsWithin(DependencyObject d, DependencyObject root)
+    {
+        for (var cur = d; cur != null; cur = cur is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(cur) : LogicalTreeHelper.GetParent(cur))
+            if (cur == root) return true;
+        return false;
+    }
+
+    /// <summary>Right of the focus card, tops lined up; moved up only as far as needed to stay inside the window.</summary>
     private CustomPopupPlacement[] PlaceGamePicker(Size popup, Size target, Point offset)
     {
         var dpi = VisualTreeHelper.GetDpi(this);   // the sizes here are in device pixels
-        double cardTop = FocusCard.TranslatePoint(new Point(0, 0), this).Y * dpi.DpiScaleY;
-        double y = Math.Max(target.Height - popup.Height + 16 * dpi.DpiScaleY, -cardTop + 12 * dpi.DpiScaleY);
+        double sy = dpi.DpiScaleY;
+        double cardTop = FocusCard.TranslatePoint(new Point(0, 0), this).Y * sy;
+        double windowBottom = ((FrameworkElement)Content).ActualHeight * sy;
+        double visible = popup.Height - 16 * sy;   // the panel's bottom margin is only room for its shadow
+        double y = Math.Min(0, windowBottom - 12 * sy - cardTop - visible);   // up if it would run off the bottom
+        y = Math.Max(y, -cardTop + 12 * sy);                                   // but never above the window's top
         return new[] { new CustomPopupPlacement(new Point(target.Width + 10 * dpi.DpiScaleX, y), PopupPrimaryAxis.Horizontal) };
     }
 
@@ -554,9 +575,15 @@ public partial class MainWindow : Window
         if (App.Tracker.Focused == before) throw new InvalidOperationException("The focus card's next arrow didn't change the focused game.");
         FocusPrev_Click(FocusPrev, new RoutedEventArgs(Button.ClickEvent));
         if (App.Tracker.Focused != before) throw new InvalidOperationException("The focus card's previous arrow didn't go back.");
-        BuildGamePicker();
+        // A click on the focus card opens the picker, a second one closes it
+        var click = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonUpEvent };
+        FocusCard_Click(FocusCard, click);
+        UpdateLayout();
+        if (!GamePicker.IsOpen) throw new InvalidOperationException("Clicking the focus card didn't open the game picker.");
         if (GamePickerTiles.Children.Count != App.Tracker.Slots.Count + 1)
             throw new InvalidOperationException($"The game picker shows {GamePickerTiles.Children.Count} tiles for {App.Tracker.Slots.Count} games.");
+        FocusCard_Click(FocusCard, click);
+        if (GamePicker.IsOpen) throw new InvalidOperationException("Clicking the focus card again didn't close the game picker.");
         App.Tracker.SetFocus(null);
 
         // The feed docked in the Tracker, on the right and along the bottom.
