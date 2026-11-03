@@ -532,9 +532,9 @@ public partial class MainWindow : Window
         _feed.SelfTest();
         // From the Feed: the focus card's arrows step through the games, and its picker lists them all
         var before = App.Tracker.Focused;
-        FocusNext_Click(FocusNext, new RoutedEventArgs());
+        FocusNext_Click(FocusNext, new RoutedEventArgs(Button.ClickEvent));
         if (App.Tracker.Focused == before) throw new InvalidOperationException("The focus card's next arrow didn't change the focused game.");
-        FocusPrev_Click(FocusPrev, new RoutedEventArgs());
+        FocusPrev_Click(FocusPrev, new RoutedEventArgs(Button.ClickEvent));
         if (App.Tracker.Focused != before) throw new InvalidOperationException("The focus card's previous arrow didn't go back.");
         BuildGamePicker();
         if (GamePickerTiles.Children.Count != App.Tracker.Slots.Count + 1)
