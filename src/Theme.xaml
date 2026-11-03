@@ -642,6 +642,36 @@
 
 
     <!-- Segmented filter pill (RadioButton) -->
+    <!-- Small round button with the pill buttons' border (e.g. the focus card's previous / next game) -->
+    <Style x:Key="CircleNav" TargetType="Button">
+        <Setter Property="Width" Value="28"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="14" Background="#1A1A1A" BorderBrush="{StaticResource LineBrush}" BorderThickness="1.5">
+                        <Viewbox Width="12" Height="12">
+                            <Path Style="{StaticResource Icon}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                  Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"/>
+                        </Viewbox>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="FilterPill" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{StaticResource Text2Brush}"/>
         <Setter Property="FontSize" Value="12.5"/>

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -250,7 +251,68 @@ public partial class MainWindow : Window
             UpdateFocusCard();
     }
 
-    private void FocusCard_Click(object sender, MouseButtonEventArgs e) => GoToTracker();
+    /// <summary>The focus card opens the game picker (works from any page, e.g. the Feed).</summary>
+    private void FocusCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (App.Tracker.Slots.Count == 0) { GoToTracker(); return; }
+        BuildGamePicker();
+        GamePicker.IsOpen = true;
+    }
+
+    private void FocusPrev_Click(object sender, RoutedEventArgs e) { App.Tracker.CycleFocus(-1); e.Handled = true; }
+    private void FocusNext_Click(object sender, RoutedEventArgs e) { App.Tracker.CycleFocus(1); e.Handled = true; }
+
+    /// <summary>All games plus each game's box art, name and number in logic, in card order; the focused one outlined.</summary>
+    private void BuildGamePicker()
+    {
+        GamePickerTiles.Children.Clear();
+        GamePickerTiles.Children.Add(PickerTile(null));
+        foreach (var s in App.Tracker.DisplayOrder) GamePickerTiles.Children.Add(PickerTile(s));
+    }
+
+    private FrameworkElement PickerTile(SlotView? s)
+    {
+        bool current = App.Tracker.Focused == s;
+        var art = new Border { Width = 84, Height = 112, CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x1F, 0x1F)) };
+        if (s != null && !string.IsNullOrEmpty(s.ArtUrl)) Art.SetUrl(art, s.ArtUrl);
+        else
+            art.Child = new Viewbox
+            {
+                Width = 30, Height = 30, Opacity = 0.35,
+                Child = new System.Windows.Shapes.Path { Style = (Style)FindResource("Icon"), Data = (Geometry)FindResource("IconGrid"), Stroke = Brushes2.Text },
+            };
+        string count = s == null ? App.Tracker.Slots.Sum(x => x.ToDo).ToString() : s.Locked ? "LOCKED" : s.Goal ? "GOALED" : s.InLogicText;
+        var label = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        label.Children.Add(new TextBlock
+        {
+            Text = s?.Title ?? "All games", FontSize = 12, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Brushes2.Text,
+        });
+        label.Children.Add(new TextBlock
+        {
+            Text = count, FontSize = 12, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center,
+            Foreground = s == null ? Brushes2.InLogic : s.Locked || s.Goal ? Brushes2.Sub : s.InLogicBrush,
+        });
+        var stack = new StackPanel();
+        stack.Children.Add(art);
+        stack.Children.Add(label);
+        var tile = new Border
+        {
+            Width = 104, Padding = new Thickness(8), Margin = new Thickness(3), CornerRadius = new CornerRadius(10), Cursor = Cursors.Hand,
+            Background = current ? (Brush)FindResource("AccentDimBrush") : Brushes.Transparent,
+            BorderBrush = current ? (Brush)FindResource("AccentLineBrush") : Brushes.Transparent, BorderThickness = new Thickness(1.5),
+            Child = stack, ToolTip = s == null ? "All games" : $"{s.Title} · {s.SlotName}",
+        };
+        tile.MouseEnter += (_, _) => { if (!current) tile.Background = (Brush)FindResource("HoverBrush"); };
+        tile.MouseLeave += (_, _) => { if (!current) tile.Background = Brushes.Transparent; };
+        tile.MouseLeftButtonUp += (_, e) =>
+        {
+            GamePicker.IsOpen = false;
+            App.Tracker.SetFocus(s);
+            e.Handled = true;
+        };
+        return tile;
+    }
 
     /// <summary>Shrink (then hide) the focus card's art so the sidebar never overlaps the menu on short windows.</summary>
     private void UpdateArtVisibility()
@@ -468,6 +530,15 @@ public partial class MainWindow : Window
         if (_feed.AsSlotName != App.Tracker.Slots[1].SlotName)
             throw new InvalidOperationException($"Feed chats as '{_feed.AsSlotName}', expected the focused '{App.Tracker.Slots[1].SlotName}'.");
         _feed.SelfTest();
+        // From the Feed: the focus card's arrows step through the games, and its picker lists them all
+        var before = App.Tracker.Focused;
+        FocusNext_Click(FocusNext, new RoutedEventArgs());
+        if (App.Tracker.Focused == before) throw new InvalidOperationException("The focus card's next arrow didn't change the focused game.");
+        FocusPrev_Click(FocusPrev, new RoutedEventArgs());
+        if (App.Tracker.Focused != before) throw new InvalidOperationException("The focus card's previous arrow didn't go back.");
+        BuildGamePicker();
+        if (GamePickerTiles.Children.Count != App.Tracker.Slots.Count + 1)
+            throw new InvalidOperationException($"The game picker shows {GamePickerTiles.Children.Count} tiles for {App.Tracker.Slots.Count} games.");
         App.Tracker.SetFocus(null);
 
         // The feed docked in the Tracker, on the right and along the bottom.

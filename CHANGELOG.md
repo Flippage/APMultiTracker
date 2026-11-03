@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.3
+
+- **Switch games from any page**: the focused game card in the sidebar has **‹ ›** buttons to step to the previous /
+  next game (like Ctrl+Tab), and clicking the card opens a panel with every game's box art and number in logic: click
+  one to focus it. Handy on the Feed page, which had no way to switch games.
+
 ## v0.12.2
 
 - **Resize the Items / Hints panel**: drag its left edge (a grip appears on hover) to make it wider or narrower, so
