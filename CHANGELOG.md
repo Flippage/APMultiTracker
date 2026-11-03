@@ -2,6 +2,10 @@
 
 ## v0.12.4
 
+- **Check lists group by place when a game lumps most of itself into one region**: The Wind Waker's apworld puts ~200
+  checks in "The Great Sea" (only dungeons and caves get their own region), so Windfall Island, Dragon Roost Island and
+  every other island were one huge group. A big region whose checks are named "<place> - …" is now grouped by that
+  place instead (Windfall Island, Outset Island, …), in any game. Games whose regions already match are unchanged.
 - Fix (engine v0.4.18): with an older Universal Tracker (before v0.2.26 or so, e.g. v0.2.22), every game failed with
   "Couldn't build logic for …: not enough values to unpack (expected 8, got 6)". Older Universal Trackers work again
   (without glitched logic, which they don't have). Updating Universal Tracker is still recommended.

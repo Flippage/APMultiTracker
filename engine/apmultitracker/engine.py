@@ -281,6 +281,27 @@ POST_BUILD_FIXES: dict[str, Callable] = {
 }
 
 
+def split_catch_all_regions(region_by_name: dict[str, str]) -> dict[str, str]:
+    """Location -> heading for the check lists. Some apworlds put most of the game in one catch-all region (The Wind
+    Waker: 198 checks in "The Great Sea"; only dungeons and caves get their own, for entrance randomizing) while the
+    location names say where each one is ("Windfall Island - Pirate Ship"). A big region (20+ checks) whose checks are
+    nearly all named "<place> - ..." with 3+ different places is split by that place instead."""
+    by_region: dict[str, list[str]] = collections.defaultdict(list)
+    for name, region in region_by_name.items():
+        by_region[region].append(name)
+    out = dict(region_by_name)
+    for region, names in by_region.items():
+        if len(names) < 20:
+            continue
+        prefixed = [n for n in names if " - " in n]
+        places = {n.split(" - ", 1)[0].strip() for n in prefixed}
+        if len(prefixed) < 0.8 * len(names) or len(places) < 3:
+            continue
+        for n in prefixed:
+            out[n] = n.split(" - ", 1)[0].strip()
+    return out
+
+
 # Pokédex checks (dexsanity) can't be judged by the logic: a Pokédex entry also appears when you only *see* a
 # Pokémon (e.g. a trainer's), and where wild Pokémon live may be randomized and not shared with trackers. With
 # dexsanity on (any game with a `dexsanity` option, e.g. Pokémon Emerald, Red and Blue, Crystal), every
@@ -590,10 +611,10 @@ class SlotContext(CommonContext):
         self.warning = (f"Universal Tracker couldn't fully rebuild {game}'s logic, so results may be "
                         f"incomplete: {last_line(core.gen_error)}") if core.gen_error else own_yaml_note
         world = core.get_current_world()
-        self.region_by_name = {
+        self.region_by_name = split_catch_all_regions({
             loc.name: (loc.parent_region.name if loc.parent_region is not None else "")
-            for loc in core.multiworld.get_locations(core.player_id)
-        }
+            for loc in core.multiworld.get_locations(core.player_id) if loc.address is not None
+        })
         saved = Utils.persistent_load().get(PERSIST_KEY, {}).get(self.persist_id, {})
         core.ignored_locations = set(saved.get("ignored", []))
         # Pretend items (UT's /manually_collect), kept only if the game still has them
