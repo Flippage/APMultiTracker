@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.4
+
+- Fix (engine v0.4.18): with an older Universal Tracker (before v0.2.26 or so, e.g. v0.2.22), every game failed with
+  "Couldn't build logic for …: not enough values to unpack (expected 8, got 6)". Older Universal Trackers work again
+  (without glitched logic, which they don't have). Updating Universal Tracker is still recommended.
+
 ## v0.12.3
 
 - **Switch games from any page**: the focused game card in the sidebar has **‹ ›** buttons to step to the previous /

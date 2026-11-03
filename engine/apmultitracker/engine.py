@@ -77,8 +77,11 @@ def apply_host_settings(core) -> None:
             os.makedirs(players.resolve(), exist_ok=True)
     except OSError:
         pass
-    (_, core.output_format, core.hide_excluded, core.use_split, deferred, core.enable_glitched_logic,
-     core.sorting_priorities, core.sorting_method) = core._set_host_settings()
+    # Universal Tracker returns more settings over time: 6 before v0.2.23ish (no sorting), 8 since.
+    values = tuple(core._set_host_settings())
+    _, core.output_format, core.hide_excluded, core.use_split, deferred, core.enable_glitched_logic = values[:6]
+    if len(values) >= 8:
+        core.sorting_priorities, core.sorting_method = values[6], values[7]
     if core.enforce_deferred_connections is None:
         core.enforce_deferred_connections = deferred
     # Always report excluded checks with their real status; the app decides whether to show them
@@ -576,7 +579,7 @@ class SlotContext(CommonContext):
         if getattr(core, "tracker_disabled", False):   # not in Universal Tracker before 0.2.34
             raise EngineError(core.gen_error or f"Universal Tracker can't track {game} with these options.")
         if core.multiworld is None or core.player_id is None:
-            errors = [line.location_label for lines in core.log_lines.values() for line in lines]
+            errors = [line.location_label for lines in getattr(core, 'log_lines', {}).values() for line in lines]
             detail = errors[0] if errors else last_line(core.gen_error)
             if "Unable to find YAML" in detail:
                 detail = (f"No YAML for “{slot_name}” in "
@@ -817,7 +820,7 @@ class SlotContext(CommonContext):
                 status = "ignored"
             elif ret.state is not None and any(loc.can_reach(ret.state) for loc in e["locations"]):
                 status = "in_logic"
-            elif ret.glitches_state is not None and any(loc.can_reach(ret.glitches_state) for loc in e["locations"]):
+            elif getattr(ret, 'glitches_state', None) is not None and any(loc.can_reach(getattr(ret, 'glitches_state', None)) for loc in e["locations"]):
                 status = "glitched"
             else:
                 status = "out_of_logic"
@@ -827,7 +830,7 @@ class SlotContext(CommonContext):
         go_mode = "no"
         if ret.state is not None and mw.has_beaten_game(ret.state, core.player_id):
             go_mode = "yes"
-        elif ret.glitches_state is not None and mw.has_beaten_game(ret.glitches_state, core.player_id):
+        elif getattr(ret, 'glitches_state', None) is not None and mw.has_beaten_game(getattr(ret, 'glitches_state', None), core.player_id):
             go_mode = "glitched"
 
         # Entrances you can reach that don't lead anywhere known yet (deferred entrance randomizers): UT lists these
@@ -843,7 +846,7 @@ class SlotContext(CommonContext):
             seen.add(e.name)
             entrances.append({"name": e.name, "region": e.parent_region.name if e.parent_region else ""})
 
-        errors = [line.location_label for group, lines in core.log_lines.items() if group < 0 for line in lines]
+        errors = [line.location_label for group, lines in getattr(core, 'log_lines', {}).items() if group < 0 for line in lines]
         # Events the logic has reached (UT's /event_inventory and /event_locations): the event and where it's from.
         events, seen_events = [], set()
         if ret.state is not None:
