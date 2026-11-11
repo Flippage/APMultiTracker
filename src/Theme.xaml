@@ -125,13 +125,14 @@
 
     <!-- ============ Buttons ============ -->
     <!-- Keyboard focus ring: WPF only shows a FocusVisualStyle for Tab / arrow-key navigation (never after a mouse click),
-         and it's drawn outside the control, so nothing changes size. RadiusX/Y clamp to a pill or circle. -->
+         and it's drawn outside the control, so nothing changes size. -->
     <Style x:Key="FocusRing">
         <Setter Property="Control.Template">
             <Setter.Value>
                 <ControlTemplate>
-                    <Rectangle Margin="-3" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" RadiusX="999" RadiusY="999"
-                               SnapsToDevicePixels="True"/>
+                    <!-- Rounded from its real size (a huge RadiusX/RadiusY clamps per axis and draws an ellipse) -->
+                    <Border Margin="-3" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2" CornerRadius="16"
+                            local:Pill.Auto="True" SnapsToDevicePixels="True"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -219,7 +220,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="20">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="20" local:Pill.Auto="True">
                         <Viewbox Width="18" Height="18">
                             <Path Style="{StaticResource Icon}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
                                   Stroke="{TemplateBinding Foreground}"/>
@@ -597,7 +598,7 @@
                     <Thumb>
                         <Thumb.Template>
                             <ControlTemplate TargetType="Thumb">
-                                <Border CornerRadius="3" Background="#3A3A3A" Margin="2,3"/>
+                                <Border CornerRadius="2" local:Pill.Auto="True" Background="#3A3A3A" Margin="2,3"/>
                             </ControlTemplate>
                         </Thumb.Template>
                     </Thumb>
@@ -621,7 +622,7 @@
                                         <Thumb>
                                             <Thumb.Template>
                                                 <ControlTemplate TargetType="Thumb">
-                                                    <Border CornerRadius="3" Background="#3A3A3A" Margin="3,2"/>
+                                                    <Border CornerRadius="2" local:Pill.Auto="True" Background="#3A3A3A" Margin="3,2"/>
                                                 </ControlTemplate>
                                             </Thumb.Template>
                                         </Thumb>

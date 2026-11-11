@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.12.7
+
+- Fix (engine v0.4.21): a game whose apworld never sets a finish condition showed **GO MODE** from the very start,
+  because Archipelago's placeholder counts as "already beaten". The tracker now ignores that placeholder.
+- **Jak 3**: its current apworld has exactly that bug when the goal is "defeat final boss". While the bug is there, the
+  tracker uses the intended goal instead (the final boss mission is reachable), so GO MODE works again. Once the
+  apworld is fixed, its own goal is used.
+- Fix: the keyboard focus ring (shown after using the keyboard, e.g. around **Only my slots**) was an oval instead of a
+  pill.
+- Fix: small icon buttons (the hide eye, the ▾ arrows, ×) and the thin scrollbar handles had squashed, lopsided
+  rounded corners.
+- The self-test now checks every screen for rounded shapes that would be drawn as ovals, so these can't creep back in.
+
 ## v0.12.6
 
 - **Pokémon Emerald: fishing encounters match the PopTracker pack** (engine v0.4.20): the three rods fish from one
