@@ -185,6 +185,11 @@ public static class Demo
             w.UpdateLayout();
             await Task.Delay(600);
             await w.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            if (Environment.GetEnvironmentVariable("APMT_CHECK_OVALS") == "1")
+            {
+                try { MainWindow.AssertNoOvals(w, name); Console.WriteLine($"ovals ok: {name}"); }
+                catch (InvalidOperationException ex) { Console.WriteLine("OVALS: " + ex.Message); }
+            }
             var enc = new PngBitmapEncoder();
             enc.Frames.Add(BitmapFrame.Create(Native.CaptureClient(w)));
             using var f = File.Create(Path.Combine(dir, name + ".png"));

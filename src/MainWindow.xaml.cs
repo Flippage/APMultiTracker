@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -457,6 +459,54 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ self-test
 
+    /// <summary>
+    /// Self-test: a rounded shape whose corner radius is more than half its height (or width) is drawn as an oval or a
+    /// lopsided blob instead of a pill. Several have crept in over time; this catches any that are on screen.
+    /// </summary>
+    internal static void AssertNoOvals(DependencyObject root, string where)
+    {
+        var bad = new List<string>();
+        void Visit(DependencyObject d)
+        {
+            if (d is FrameworkElement fe && fe.IsVisible && fe.ActualWidth > 2 && fe.ActualHeight > 2)
+            {
+                double half = Math.Min(fe.ActualWidth, fe.ActualHeight) / 2 + 0.5;
+                if (d is Border b)
+                {
+                    var r = b.CornerRadius;
+                    if (Math.Max(Math.Max(r.TopLeft, r.TopRight), Math.Max(r.BottomLeft, r.BottomRight)) > half)
+                    {
+                        string name = (b.TemplatedParent as FrameworkElement)?.Name is { Length: > 0 } n ? n : b.Name;
+                        bad.Add($"{name} border {fe.ActualWidth:0}x{fe.ActualHeight:0} radius {r.TopLeft}");
+                    }
+                }
+                else if (d is System.Windows.Shapes.Rectangle rect && (rect.RadiusX > half || rect.RadiusY > half))
+                    bad.Add($"{rect.Name} rectangle {fe.ActualWidth:0}x{fe.ActualHeight:0} radius {rect.RadiusX}x{rect.RadiusY}");
+            }
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++) Visit(VisualTreeHelper.GetChild(d, i));
+        }
+        Visit(root);
+        if (bad.Count > 0)
+            throw new InvalidOperationException($"Oval-shaped controls on {where}: " + string.Join("; ", bad.Distinct().Take(5)));
+    }
+
+    /// <summary>Self-test: the keyboard focus ring is a pill around a wide control, not an ellipse.</summary>
+    private void AssertFocusRingIsPill()
+    {
+        var ring = new Control { Template = (ControlTemplate)((Style)FindResource("FocusRing")).Setters.OfType<Setter>().First().Value,
+                                 Width = 140, Height = 32 };
+        var host = new Border { Child = ring };
+        host.Measure(new Size(200, 60));
+        host.Arrange(new Rect(0, 0, 200, 60));
+        ring.ApplyTemplate();
+        host.UpdateLayout();
+        if (VisualTreeHelper.GetChildrenCount(ring) == 0 || VisualTreeHelper.GetChild(ring, 0) is not Border b)
+            throw new InvalidOperationException("The focus ring template isn't a rounded border.");
+        double want = Math.Min(b.ActualWidth, b.ActualHeight) / 2;
+        if (Math.Abs(b.CornerRadius.TopLeft - want) > 0.5)
+            throw new InvalidOperationException($"The focus ring is {b.ActualWidth:0}x{b.ActualHeight:0} with radius {b.CornerRadius.TopLeft}, not a pill.");
+    }
+
     public async Task SelfTestAsync()
     {
         // Opening the Feed with a game focused: that game's slot is the one you chat as.
@@ -485,13 +535,16 @@ public partial class MainWindow : Window
         App.Config.FeedDock = "Right";
         _tracker.ApplyFeedDock();
         UpdateLayout();
-        foreach (var nav in new[] { NavMultiworlds, NavSettings, NavTracker })
+        foreach (var nav in new[] { NavMultiworlds, NavSettings, NavFeed, NavTracker })
         {
             nav.IsChecked = true;
             UpdateLayout();
+            AssertNoOvals(this, nav.Name);
         }
+        AssertFocusRingIsPill();
         OpenMultiworldEditor(App.Config.Multiworlds.FirstOrDefault());
         UpdateLayout();
+        AssertNoOvals(this, "multiworld editor");
         CloseMultiworldEditor();
         OpenMultiworldEditor(null);
         UpdateLayout();

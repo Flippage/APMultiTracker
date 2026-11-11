@@ -1246,6 +1246,12 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         ItemsToggle.IsChecked = false;
         ExplainToggle.IsChecked = true;
         ShowExplain("Self-test", "green");
+        ItemsToggle.IsChecked = true;
+        HintsToggle.IsChecked = true;
+        UpdateLayout();
+        MainWindow.AssertNoOvals(this, "a focused game with Items, Hints and Explain open");
+        ItemsToggle.IsChecked = false;
+        HintsToggle.IsChecked = false;
         UpdateLayout();
         // A clicked button keeps keyboard focus: that must not resize it or recolour its border (it once did).
         double explainW = ExplainBtn.ActualWidth, pathW = PathBtn.ActualWidth;
@@ -1311,6 +1317,7 @@ public partial class TrackerPage : UserControl, INotifyPropertyChanged
         HintPopup.IsOpen = true;
         UpdateLayout();
         if (!HintPopup.IsOpen || HintPopup.ActualHeight < 20) throw new InvalidOperationException("Hint dropdown didn't open.");
+        MainWindow.AssertNoOvals(this, "the hint dropdown");
         var box = HintBoxRow.TranslatePoint(new Point(0, HintBoxRow.ActualHeight), HintsPanel);
         var drop = HintPopup.TranslatePoint(new Point(0, 0), HintsPanel);
         if (Math.Abs(drop.Y - box.Y) > 12 || Math.Abs(drop.X - box.X) > 2) throw new InvalidOperationException("Hint dropdown isn't under its box.");

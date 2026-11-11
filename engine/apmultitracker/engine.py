@@ -85,6 +85,49 @@ def apply_host_settings(core) -> None:
     core.hide_excluded = False
 
 
+def has_real_goal(multiworld, player: int) -> bool:
+    """False when a world left Archipelago's placeholder finish condition (``lambda state: True`` in BaseClasses),
+    e.g. because of a bug in it: go mode would then show from the very start."""
+    rule = multiworld.completion_condition.get(player)
+    code = getattr(rule, "__code__", None)
+    return not (code is not None and code.co_name == "<lambda>"
+                and os.path.basename(code.co_filename).lower() == "baseclasses.py")
+
+
+def intended_goal(world, player: int) -> Optional[Callable]:
+    """
+    A replacement finish condition for a world known to lose its own, or None.
+
+    Jak 3: with "complete specific mission", the apworld looks the option (a task id, e.g. 71 = final boss) up as a
+    mission id, finds nothing and never sets a finish condition. Its intended goal is that mission's location being
+    reachable. Only used while the bug is present (the caller checks for the placeholder), so a fixed apworld is
+    left alone.
+    """
+    try:
+        if getattr(world, "game", "") != "Jak 3":
+            return None
+        opts = world.options
+        if opts.jak_3_completion_condition.value != opts.jak_3_completion_condition.option_complete_specific_mission:
+            return None
+        import importlib
+        package = type(world).__module__.rsplit(".", 1)[0] if type(world).__module__.count(".") > 1             else type(world).__module__
+        missions = importlib.import_module(package + ".locs.mission_locations").main_mission_table
+        task = opts.specific_mission_for_completion.value
+        mission = next((m for m in missions.values() if getattr(m, "task_id", None) == task), None)
+        if mission is None:
+            return None
+        dual = opts.location_check_mode.value == opts.location_check_mode.option_dual_checks
+        target = mission.name if dual else f"{mission.name} - Check 1"
+        world.multiworld.get_location(target, player)   # must exist, or no go mode at all
+        if not getattr(world, "_apmt_goal_logged", False):
+            world._apmt_goal_logged = True
+            log.info(f"Jak 3 never set its finish condition (apworld bug); using its intended goal: reach “{target}”")
+        return lambda state: state.can_reach_location(target, player)
+    except Exception:
+        log.debug("No intended goal for %s", getattr(world, "game", "?"), exc_info=True)
+        return None
+
+
 def last_line(text: str) -> str:
     lines = [line.strip() for line in (text or "").strip().splitlines() if line.strip()]
     return lines[-1] if lines else ""
@@ -536,10 +579,17 @@ class SlotContext(CommonContext):
             })
 
         go_mode = "no"
-        if ret.state is not None and mw.has_beaten_game(ret.state, core.player_id):
-            go_mode = "yes"
-        elif ret.glitches_state is not None and mw.has_beaten_game(ret.glitches_state, core.player_id):
-            go_mode = "glitched"
+        if has_real_goal(mw, core.player_id):
+            beaten = lambda state: mw.has_beaten_game(state, core.player_id)
+        else:
+            # The world never set a finish condition (Archipelago's placeholder says "beaten" from the start).
+            # Known apworld bugs get their intended goal back; anything else simply has no go mode.
+            beaten = intended_goal(world, core.player_id)
+        if beaten is not None:
+            if ret.state is not None and beaten(ret.state):
+                go_mode = "yes"
+            elif ret.glitches_state is not None and beaten(ret.glitches_state):
+                go_mode = "glitched"
 
         # Entrances you can reach that don't lead anywhere known yet (deferred entrance randomizers): UT lists these
         # as "unconnected" lines until the game reports where they go.
